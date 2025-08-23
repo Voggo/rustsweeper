@@ -1,0 +1,10 @@
+[package]
+name = "rust_sweeper"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.99"
+constant = "0.2.0"
+crossterm = "0.29"
+rand = "0.9.2"

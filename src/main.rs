@@ -4,7 +4,7 @@ use rand::prelude::*;
 use std::io::Write;
 use std::io::{Stdout, stdout};
 
-use anyhow::{Ok, Result};
+// use anyhow::{Ok, Result};
 
 use crossterm::terminal::{Clear, SetSize, size};
 use crossterm::{
@@ -13,6 +13,7 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     style::*,
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
+    {execute, queue},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,42 +33,23 @@ enum CellKind {
 struct CellBox {
     kind: CellKind,
     state: CellState,
-    // maybe add a draw position,
-    // to both reference state and position at the same time
 }
 
 struct Board {
-    grid: Vec<Vec<CellBox>>,
+    grid: Vec<CellBox>,
     width: usize,
     height: usize,
 }
 
 impl Board {
-    fn new(width: usize, height: usize, mine_count: usize) -> Board {
+    fn new(width: usize, height: usize) -> Board {
         let mut grid = vec![
-            vec![
-                CellBox {
-                    kind: CellKind::Number(1),
-                    state: CellState::Hidden,
-                };
-                width
-            ];
-            height
+            CellBox {
+                kind: CellKind::Number(0),
+                state: CellState::Hidden,
+            };
+            width * height
         ];
-        let mut rng = rand::rng();
-        // TODO: fix rejection sampling to more efficient method
-        for _i in 0..mine_count {
-            let mut x: usize;
-            let mut y: usize;
-            loop {
-                x = rng.random_range(0..width);
-                y = rng.random_range(0..height);
-                if let CellKind::Number(_) = grid[x][y].kind {
-                    break;
-                }
-            }
-            grid[x][y].kind = CellKind::Mine;
-        }
         Board {
             grid,
             width,
@@ -75,114 +57,142 @@ impl Board {
         }
     }
 
-    fn render_game_board(&self) {
-        let mut stdout = stdout();
-        stdout
-            .execute(Clear(terminal::ClearType::All))
-            .expect("Failed to clear line");
-        let (board_start_x, board_start_y) = self.get_board_start_pos();
-        stdout
-            .execute(MoveTo(board_start_x, board_start_y))
-            .expect("Failed to move cursor to start position");
-        let mut i = 0;
-        for row in &self.grid {
-            for cell in row {
-                let (symbol, color) = match cell.state {
-                    CellState::Hidden => ("■", Color::DarkGrey), // Hidden cell
-                    CellState::Revealed => match cell.kind {
-                        CellKind::Mine => ("💣", Color::Red), // Mine
-                        CellKind::Number(n) => (
-                            // Numbered cell
-                            match n {
-                                0 => " ",
-                                1 => "1",
-                                2 => "2",
-                                3 => "3",
-                                4 => "4",
-                                5 => "5",
-                                6 => "6",
-                                7 => "7",
-                                8 => "8",
-                                _ => " ",
-                            },
-                            Color::Blue,
-                        ),
-                    },
-                    CellState::Flagged => ("🚩", Color::Yellow), // Flagged cell
-                };
-                let symbol = if symbol == "💣" {
-                    format!("{:>1}", symbol)
-                } else {
-                    format!("{:^2}", symbol)
-                };
+    fn place_mines(&mut self, mine_count: usize) {
+        let mut rng = rand::rng();
+        let mut set_index = (0..(self.width * self.height)).collect::<Vec<usize>>();
+        set_index.shuffle(&mut rng);
+        for i in 0..mine_count {
+            let idx = set_index[i];
+            self.grid[idx].kind = CellKind::Mine;
+            let x = (idx % self.width) as isize;
+            let y = (idx as isize - x) / self.width as isize;
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    if dx == 0 && dy == 0 {
+                        continue;
+                    }
+                    if let Some(neighbor) = self.get_cell_mut(x + dx, y + dy) {
+                        if let CellKind::Number(ref mut n) = neighbor.kind {
+                            *n += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-                // Print the symbol with the appropriate color
-                stdout
-                    .execute(SetForegroundColor(color))
-                    .expect("Failed to set color");
-                stdout
-                    .execute(Print(symbol))
-                    .expect("Failed to print symbol");
-                // stdout.execute(ResetColor).expect("Failed to reset color");
+    fn get_cell(&self, x: isize, y: isize) -> Option<&CellBox> {
+        if x >= 0 && x < self.width as isize && y >= 0 && y < self.height as isize {
+            let index = y * self.width as isize + x;
+            Some(&self.grid[index as usize])
+        } else {
+            None
+        }
+    }
+
+    fn get_cell_mut(&mut self, x: isize, y: isize) -> Option<&mut CellBox> {
+        if x >= 0 && x < self.width as isize && y >= 0 && y < self.height as isize {
+            let index = y * self.width as isize + x;
+            Some(&mut self.grid[index as usize])
+        } else {
+            None
+        }
+    }
+
+    fn render_game_board(&self, stdout: &mut Stdout) -> anyhow::Result<()> {
+        let (board_start_x, board_start_y) = self.get_board_start_pos();
+        queue!(
+            stdout,
+            Clear(terminal::ClearType::All),
+            MoveTo(board_start_x, board_start_y)
+        )?;
+        let mut i = 0;
+        for y in 0..self.width {
+            for x in 0..self.height as isize {
+                if let Some(cell) = self.get_cell(x as isize, y as isize) {
+                    let (symbol, color) = match cell.state {
+                        CellState::Hidden => ("■", Color::DarkGrey), // Hidden cell
+                        CellState::Revealed => match cell.kind {
+                            CellKind::Mine => ("💣", Color::Black),      // Mine
+                            CellKind::Number(0) => ("  ", Color::Black), // Empty cell
+                            CellKind::Number(n) => (&n.to_string()[..], Color::Blue),
+                        },
+                        CellState::Flagged => ("F", Color::DarkRed), // Flagged cell
+                    };
+                    let symbol = if symbol == "💣" {
+                        format!("{:>1}", symbol)
+                    } else {
+                        format!("{:^2}", symbol)
+                    };
+                    queue!(stdout, SetForegroundColor(color), Print(symbol))?;
+                }
             }
             i += 1;
-            stdout
-                .execute(MoveTo(0 + board_start_x, i + board_start_y))
-                .expect("Failed to move cursor");
+            queue!(stdout, MoveTo(board_start_x, i + board_start_y))?;
         }
+        stdout.flush()?;
+        Ok(())
     }
     fn get_board_start_pos(&self) -> (u16, u16) {
         let (cols, rows) = crossterm::terminal::size().expect("Failed to get terminal size");
-        let board_start_x = (cols - (self.width * 2) as u16) / 2;
-        let board_start_y = (rows - self.height as u16) / 2;
-        (board_start_x, board_start_y)
+        let board_start_x = (cols as i16 - (self.width * 2) as i16) / 2;
+        let board_start_y = (rows as i16 - self.height as i16) / 2;
+        (board_start_x as u16, board_start_y as u16)
     }
-    fn handle_mouse_event(&mut self, event: event::MouseEvent) {
-        if let event::MouseEventKind::Down(MouseButton::Left) = event.kind {
-            let (board_start_x, board_start_y) = self.get_board_start_pos();
-            let cell_x = (event.column as isize - board_start_x as isize) / 2;
-            let cell_y = event.row as isize - board_start_y as isize;
-            if cell_x >= self.width as isize || cell_y >= self.height as isize {
-                write!(stdout(), "Mouse click out of bounds!").expect("!");
-                return;
-            } else {
-                self.grid[cell_y][cell_x].state = match self.grid[cell_x][cell_y].state {
-                    CellState::Hidden => CellState::Revealed, // Reveal the cell
-                    CellState::Revealed => CellState::Flagged, // Flag the cell
-                    CellState::Flagged => CellState::Hidden,  // Unflag the cell
-                };
-            }
+    fn handle_mouse_left(&mut self, event: event::MouseEvent) {
+        let (board_start_x, board_start_y) = self.get_board_start_pos();
+        let cell_x = (event.column as isize - board_start_x as isize) / 2;
+        let cell_y = event.row as isize - board_start_y as isize;
+        if let Some(cell) = self.get_cell_mut(cell_x, cell_y) {
+            cell.state = match cell.state {
+                CellState::Hidden => CellState::Revealed,
+                _ => cell.state, // Do nothing if it's already revealed or flagged
+            };
+        } else {
+            write!(stdout(), "Mouse click out of bounds!").expect("!");
+        }
+    }
+    fn handle_mouse_right(&mut self, event: event::MouseEvent) {
+        let (board_start_x, board_start_y) = self.get_board_start_pos();
+        let cell_x = (event.column as isize - board_start_x as isize) / 2;
+        let cell_y = event.row as isize - board_start_y as isize;
+        if let Some(cell) = self.get_cell_mut(cell_x, cell_y) {
+            cell.state = match cell.state {
+                CellState::Hidden => CellState::Flagged,
+                CellState::Flagged => CellState::Hidden,
+                _ => cell.state, // Do nothing if it's already revealed
+            };
+        } else {
+            write!(stdout(), "Mouse click out of bounds!").expect("!");
         }
     }
 }
 
 // set up and clean up section
-fn setup_terminal(mut stdout: &Stdout) -> Result<()> {
+fn setup_terminal(mut stdout: &Stdout) -> Result<(), std::io::Error> {
     terminal::enable_raw_mode()?;
-    stdout.execute(EnterAlternateScreen)?;
-    stdout.execute(EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     return Ok(());
 }
 
 // set styles
-fn set_styles(mut stdout: &Stdout) -> Result<()> {
-    stdout.execute(SetBackgroundColor(Color::Yellow))?;
-    stdout.execute(SetForegroundColor(Color::Red))?;
-
-    // clean everything
-    stdout.execute(Clear(terminal::ClearType::All))?;
+fn set_styles(mut stdout: &Stdout) -> Result<(), std::io::Error> {
+    execute!(
+        stdout,
+        SetBackgroundColor(Color::Yellow),
+        SetForegroundColor(Color::Blue),
+        Clear(terminal::ClearType::All)
+    )?;
     return Ok(());
 }
 
-fn cleanup_terminal(mut stdout: &Stdout) -> Result<()> {
-    stdout.execute(Show)?;
-    stdout.execute(LeaveAlternateScreen)?;
-    stdout.execute(DisableMouseCapture)?;
+fn cleanup_terminal(mut stdout: &Stdout) -> Result<(), std::io::Error> {
+    execute!(stdout, Show, LeaveAlternateScreen, DisableMouseCapture)?;
     terminal::disable_raw_mode()?;
     return Ok(());
 }
 
-fn should_exit(event: &Event) -> Result<bool> {
+fn should_exit(event: &Event) -> Result<bool, std::io::Error> {
     if let Event::Key(key_event) = event.to_owned() {
         if key_event.code == KeyCode::Esc
             || (key_event.code == KeyCode::Char('c')
@@ -191,20 +201,23 @@ fn should_exit(event: &Event) -> Result<bool> {
             return Ok(true);
         }
     }
-
     return Ok(false);
 }
 
-fn main() -> Result<()> {
+fn main() -> Result<(), anyhow::Error> {
     let mut stdout = stdout();
     // terminal set up
     setup_terminal(&stdout)?;
     set_styles(&stdout)?;
-    let mut board = Board::new(10, 10, 8);
-    board.render_game_board();
+    let mut board = Board::new(10, 10);
+    board.place_mines(8);
+    board.render_game_board(&mut stdout)?;
 
     'drawing: loop {
         let event = event::read()?;
+        if should_exit(&event)? == true {
+            break 'drawing;
+        }
 
         if let Event::Mouse(event) = event {
             // Handle mouse events here if needed
@@ -215,8 +228,11 @@ fn main() -> Result<()> {
                     stdout.execute(MoveTo(event.column, event.row))?;
                 }
                 event::MouseEventKind::Down(MouseButton::Left) => {
-                    board.handle_mouse_event(event);
-                    board.render_game_board();
+                    board.handle_mouse_left(event);
+                }
+
+                event::MouseEventKind::Down(MouseButton::Right) => {
+                    board.handle_mouse_right(event);
                 }
                 _ => {
                     // Handle other mouse events (e.g., clicks, scrolls) if needed
@@ -224,9 +240,8 @@ fn main() -> Result<()> {
                 }
             }
         }
-        if should_exit(&event)? == true {
-            break 'drawing;
-        }
+
+        board.render_game_board(&mut stdout)?;
     }
     cleanup_terminal(&stdout)?;
     Ok(())

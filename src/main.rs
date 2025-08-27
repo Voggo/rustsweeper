@@ -41,6 +41,18 @@ const COLOR_CONFIG: ColorConfig = ColorConfig {
     border: Color::Black,
 };
 
+struct GameConfig {
+    width: usize,
+    height: usize,
+    mines: usize,
+}
+
+const GAME_CONFIG: GameConfig = GameConfig {
+    width: 30,
+    height: 30,
+    mines: 60,
+};
+
 enum GameState {
     Ongoing,
     Won,
@@ -75,20 +87,20 @@ struct Board {
 }
 
 impl Board {
-    fn new(width: usize, height: usize) -> Board {
+    fn new() -> Board {
         let grid = vec![
             CellBox {
                 kind: CellKind::Number(0),
                 state: CellState::Hidden,
             };
-            width * height
+            GAME_CONFIG.width * GAME_CONFIG.height
         ];
         Board {
             grid,
-            width,
-            height,
+            width: GAME_CONFIG.width,
+            height: GAME_CONFIG.height,
+            mines_to_place: GAME_CONFIG.mines,
             mines_placed: false,
-            mines_to_place: 1,
         }
     }
 
@@ -294,6 +306,52 @@ fn cleanup_terminal(mut stdout: &Stdout) -> Result<(), std::io::Error> {
     return Ok(());
 }
 
+/// Overlay ASCII art above the finished game board for win/lose screens.
+/// If there is room, place it above the board; otherwise, center in terminal.
+fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyhow::Result<()> {
+    let win_art = [
+        " __     __          __          ___       ",
+        " \\ \\   / /          \\ \\        / (_)      ",
+        "  \\ \\_/ /__  _   _   \\ \\  /\\  / / _ _ __  ",
+        "   \\   / _ \\| | | |   \\ \\/  \\/ / | | '_ \\ ",
+        "    | | (_) | |_| |    \\  /\\  /  | | | | |",
+        "    |_|\\___/ \\__,_|     \\/  \\/   |_|_| |_|",
+    ];
+    let lose_art = [
+        "  _____                         ____                 ",
+        " / ____|                       / __ \\                ",
+        "| |  __  __ _ _ __ ___   ___  | |  | |_   _____ _ __ ",
+        "| | |_ |/ _` | '_ ` _ \\ / _ \\ | |  | \\ \\ / / _ \\ '__|",
+        "| |__| | (_| | | | | | |  __/ | |__| |\\ V /  __/ |   ",
+        " \\_____|\\__,_|_| |_| |_|\\___|  \\____/  \\_/ \\___|_|   ",
+    ];
+    let art = if win { &win_art } else { &lose_art };
+    let color = if win { Color::Green } else { Color::Red };
+
+    let (cols, rows) = crossterm::terminal::size().expect("Failed to get terminal size");
+    let art_width = art[0].len() as u16;
+    let art_height = art.len() as u16;
+    let art_x = (cols.saturating_sub(art_width)) / 2;
+
+    let (_, board_start_y) = board.get_board_start_pos();
+    let art_y = if board_start_y >= art_height + 1 {
+        board_start_y - art_height - 1
+    } else {
+        (rows.saturating_sub(art_height)) / 2
+    };
+
+    for (i, line) in art.iter().enumerate() {
+        queue!(
+            stdout,
+            SetForegroundColor(color),
+            MoveTo(art_x, art_y + i as u16),
+            Print(line),
+        )?;
+    }
+    stdout.flush()?;
+    Ok(())
+}
+
 fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<()> {
     let (board_start_x, board_start_y) = board.get_board_start_pos();
     queue!(
@@ -301,7 +359,6 @@ fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<()> {
         Clear(terminal::ClearType::All),
         MoveTo(board_start_x, board_start_y)
     )?;
-
     // Draw top border
     queue!(
         stdout,
@@ -380,7 +437,7 @@ fn main() -> Result<(), anyhow::Error> {
     // terminal set up
     setup_terminal(&stdout)?;
     set_styles(&stdout)?;
-    let mut board = Board::new(10, 10);
+    let mut board = Board::new();
     render_game_board(&board, &mut stdout)?;
     let mut game_state = GameState::Ongoing;
     'game_loop: loop {
@@ -417,6 +474,7 @@ fn main() -> Result<(), anyhow::Error> {
             GameState::Ongoing => (),
             GameState::Won => {
                 render_game_board(&board, &mut stdout)?;
+                overlay_ascii_art(&mut stdout, &board, true)?;
                 std::thread::sleep(std::time::Duration::from_secs(3));
                 cleanup_terminal(&stdout)?;
                 println!("You won! Congratulations!");
@@ -430,6 +488,7 @@ fn main() -> Result<(), anyhow::Error> {
                     }
                 }
                 render_game_board(&board, &mut stdout)?;
+                overlay_ascii_art(&mut stdout, &board, false)?;
                 std::thread::sleep(std::time::Duration::from_secs(3));
                 cleanup_terminal(&stdout)?;
                 println!("You hit a mine! Game Over!");

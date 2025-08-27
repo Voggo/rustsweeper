@@ -1,10 +1,36 @@
+use crossterm::cursor::RestorePosition;
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture, MouseButton};
 use rand::prelude::*;
 
 use std::io::Write;
 use std::io::{Stdout, stdout};
 
-// use anyhow::{Ok, Result};
+struct ColorConfig {
+    hidden_cell: Color,
+    flagged_cell: Color,
+    mine: Color,
+    empty_cell: Color,
+    number: [Color; 8],
+    border: Color,
+}
+
+const COLOR_CONFIG: ColorConfig = ColorConfig {
+    hidden_cell: Color::DarkGrey,
+    flagged_cell: Color::DarkRed,
+    mine: Color::Black,
+    empty_cell: Color::Black,
+    number: [
+        Color::Blue,       // 1
+        Color::Green,      // 2
+        Color::Red,        // 3
+        Color::Magenta,    // 4
+        Color::DarkYellow, // 5
+        Color::Cyan,       // 6
+        Color::White,      // 7
+        Color::Grey,       // 8
+    ],
+    border: Color::Black,
+};
 
 use crossterm::terminal::{Clear, SetSize, size};
 use crossterm::{
@@ -17,7 +43,6 @@ use crossterm::{
 };
 
 enum GameState {
-    New,
     Ongoing,
     Won,
     Lost,
@@ -64,7 +89,7 @@ impl Board {
             width,
             height,
             mines_placed: false,
-            mines_to_place: 99,
+            mines_to_place: 30,
         }
     }
 
@@ -118,7 +143,7 @@ impl Board {
     }
     fn get_board_start_pos(&self) -> (u16, u16) {
         let (cols, rows) = crossterm::terminal::size().expect("Failed to get terminal size");
-        let board_start_x = (cols as i16 - (self.width * 2) as i16) / 2;
+        let board_start_x = (cols as i16 - (self.width * 2 + 2) as i16) / 2;
         let board_start_y = (rows as i16 - self.height as i16) / 2;
         (board_start_x as u16, board_start_y as u16)
     }
@@ -178,8 +203,9 @@ impl Board {
     }
     fn handle_mouse_left(&mut self, event: event::MouseEvent) -> Option<GameState> {
         let (board_start_x, board_start_y) = self.get_board_start_pos();
-        let cell_x = (event.column as isize - board_start_x as isize) / 2;
-        let cell_y = event.row as isize - board_start_y as isize;
+        // Offset mouse coordinates by border (1 for top, 2 for left: border + space)
+        let cell_x = ((event.column as isize - board_start_x as isize - 2) / 2).max(0);
+        let cell_y = (event.row as isize - board_start_y as isize - 1).max(0);
         if self.mines_placed == false {
             self.place_mines(cell_x, cell_y);
             self.mines_placed = true;
@@ -212,8 +238,9 @@ impl Board {
     }
     fn handle_mouse_right(&mut self, event: event::MouseEvent) {
         let (board_start_x, board_start_y) = self.get_board_start_pos();
-        let cell_x = (event.column as isize - board_start_x as isize) / 2;
-        let cell_y = event.row as isize - board_start_y as isize;
+        // Offset mouse coordinates by border (1 for top, 2 for left: border + space)
+        let cell_x = ((event.column as isize - board_start_x as isize - 2) / 2).max(0);
+        let cell_y = (event.row as isize - board_start_y as isize - 1).max(0);
         if let Some(cell) = self.get_cell_mut(cell_x, cell_y) {
             cell.state = match cell.state {
                 CellState::Hidden => CellState::Flagged,
@@ -237,15 +264,22 @@ fn setup_terminal(mut stdout: &Stdout) -> Result<(), std::io::Error> {
 fn set_styles(mut stdout: &Stdout) -> Result<(), std::io::Error> {
     execute!(
         stdout,
-        SetBackgroundColor(Color::Yellow),
-        SetForegroundColor(Color::Blue),
+        SetBackgroundColor(Color::White),
+        SetForegroundColor(Color::Black),
         Clear(terminal::ClearType::All)
     )?;
     return Ok(());
 }
 
 fn cleanup_terminal(mut stdout: &Stdout) -> Result<(), std::io::Error> {
-    execute!(stdout, Show, LeaveAlternateScreen, DisableMouseCapture)?;
+    execute!(
+        stdout,
+        Show,
+        LeaveAlternateScreen,
+        DisableMouseCapture,
+        ResetColor,
+        RestorePosition
+    )?;
     terminal::disable_raw_mode()?;
     return Ok(());
 }
@@ -257,18 +291,40 @@ fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<()> {
         Clear(terminal::ClearType::All),
         MoveTo(board_start_x, board_start_y)
     )?;
-    let mut i = 0;
-    for y in 0..board.width {
-        for x in 0..board.height as isize {
+
+    // Draw top border
+    queue!(
+        stdout,
+        SetForegroundColor(COLOR_CONFIG.border),
+        MoveTo(board_start_x, board_start_y),
+        Print("┌"),
+    )?;
+    for _ in 0..board.width {
+        queue!(stdout, Print("──"))?;
+    }
+    queue!(stdout, Print("─┐"))?;
+
+    // Draw board rows with left/right borders
+    for y in 0..board.height {
+        queue!(
+            stdout,
+            MoveTo(board_start_x, board_start_y + 1 + y as u16),
+            Print("│ "),
+        )?;
+        for x in 0..board.width {
+            // Render cells with offset for border
             if let Some(cell) = board.get_cell(x as isize, y as isize) {
                 let (symbol, color) = match cell.state {
-                    CellState::Hidden => ("■", Color::DarkGrey), // Hidden cell
+                    CellState::Hidden => ("■", COLOR_CONFIG.hidden_cell),
+                    CellState::Flagged => ("⚑", COLOR_CONFIG.flagged_cell),
                     CellState::Revealed => match cell.kind {
-                        CellKind::Mine => ("💣", Color::Black),      // Mine
-                        CellKind::Number(0) => ("  ", Color::Black), // Empty cell
-                        CellKind::Number(n) => (&n.to_string()[..], Color::Blue),
+                        CellKind::Mine => ("💣", COLOR_CONFIG.mine),
+                        CellKind::Number(0) => ("  ", COLOR_CONFIG.empty_cell),
+                        CellKind::Number(n) => (
+                            &n.to_string()[..],
+                            COLOR_CONFIG.number[(n as usize).saturating_sub(1).min(7)],
+                        ),
                     },
-                    CellState::Flagged => ("F", Color::DarkRed), // Flagged cell
                 };
                 let symbol = if symbol == "💣" {
                     format!("{:>1}", symbol)
@@ -278,9 +334,21 @@ fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<()> {
                 queue!(stdout, SetForegroundColor(color), Print(symbol))?;
             }
         }
-        i += 1;
-        queue!(stdout, MoveTo(board_start_x, i + board_start_y))?;
+        queue!(stdout, SetForegroundColor(COLOR_CONFIG.border), Print("│"))?;
     }
+
+    // Draw bottom border
+    queue!(
+        stdout,
+        SetForegroundColor(COLOR_CONFIG.border),
+        MoveTo(board_start_x, board_start_y + 1 + board.height as u16),
+        Print("└"),
+    )?;
+    for _ in 0..board.width {
+        queue!(stdout, Print("──"))?;
+    }
+    queue!(stdout, Print("─┘"))?;
+
     stdout.flush()?;
     Ok(())
 }
@@ -305,11 +373,10 @@ fn main() -> Result<(), anyhow::Error> {
     let mut board = Board::new(10, 10);
     render_game_board(&board, &mut stdout)?;
     let mut game_state = GameState::Ongoing;
-
-    'drawing: loop {
+    'game_loop: loop {
         let event = event::read()?;
         if should_exit(&event)? == true {
-            break 'drawing;
+            break 'game_loop;
         }
 
         if let Event::Mouse(event) = event {
@@ -318,7 +385,7 @@ fn main() -> Result<(), anyhow::Error> {
             match event.kind {
                 event::MouseEventKind::Moved => {
                     // Handle mouse movement if needed
-                    stdout.execute(MoveTo(event.column, event.row))?;
+                    queue!(stdout, MoveTo(event.column, event.row))?;
                 }
                 event::MouseEventKind::Down(MouseButton::Left) => {
                     if let Some(game_state_change) = board.handle_mouse_left(event) {
@@ -344,9 +411,9 @@ fn main() -> Result<(), anyhow::Error> {
                 }
             }
             render_game_board(&board, &mut stdout)?;
+            std::thread::sleep(std::time::Duration::from_secs(3));
             cleanup_terminal(&stdout)?;
             println!("You hit a mine! Game Over!");
-            std::thread::sleep(std::time::Duration::from_secs(3));
             return Ok(());
         }
 

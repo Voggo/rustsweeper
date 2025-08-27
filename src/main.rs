@@ -1,9 +1,18 @@
-use crossterm::cursor::RestorePosition;
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture, MouseButton};
 use rand::prelude::*;
 
 use std::io::Write;
 use std::io::{Stdout, stdout};
+
+use crossterm::terminal::Clear;
+use crossterm::{
+    cursor::{MoveTo, RestorePosition, Show},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers, MouseButton,
+    },
+    style::*,
+    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
+    {execute, queue},
+};
 
 struct ColorConfig {
     hidden_cell: Color,
@@ -30,16 +39,6 @@ const COLOR_CONFIG: ColorConfig = ColorConfig {
         Color::Grey,       // 8
     ],
     border: Color::Black,
-};
-
-use crossterm::terminal::{Clear, SetSize, size};
-use crossterm::{
-    ExecutableCommand,
-    cursor::{Hide, MoveTo, Show},
-    event::{self, Event, KeyCode, KeyModifiers},
-    style::*,
-    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
-    {execute, queue},
 };
 
 enum GameState {
@@ -89,7 +88,7 @@ impl Board {
             width,
             height,
             mines_placed: false,
-            mines_to_place: 30,
+            mines_to_place: 1,
         }
     }
 
@@ -147,6 +146,14 @@ impl Board {
         let board_start_y = (rows as i16 - self.height as i16) / 2;
         (board_start_x as u16, board_start_y as u16)
     }
+    fn check_win_condition(&self) -> Option<GameState> {
+        for cell in self.grid.iter() {
+            if cell.kind != CellKind::Mine && cell.state != CellState::Revealed {
+                return None; // Found a non-mine cell that is not revealed
+            }
+        }
+        Some(GameState::Won) // All non-mine cells are revealed
+    }
     fn reveal_adjacent_empty(&mut self, x: isize, y: isize) -> Option<GameState> {
         let mut to_reveal = vec![(x, y)];
         while let Some((cx, cy)) = to_reveal.pop() {
@@ -180,7 +187,7 @@ impl Board {
                 }
             }
         }
-        return None;
+        return self.check_win_condition();
     }
     fn reveal_non_flagged(&mut self, x: isize, y: isize) -> Option<GameState> {
         let mut ret = None;
@@ -198,6 +205,9 @@ impl Board {
                     }
                 }
             }
+        }
+        if ret.is_none() {
+            ret = self.check_win_condition();
         }
         return ret;
     }
@@ -403,18 +413,28 @@ fn main() -> Result<(), anyhow::Error> {
             }
         }
 
-        if let GameState::Lost = game_state {
-            // Reveal all mines
-            for cell in board.grid.iter_mut() {
-                if cell.kind == CellKind::Mine {
-                    cell.state = CellState::Revealed;
-                }
+        match game_state {
+            GameState::Ongoing => (),
+            GameState::Won => {
+                render_game_board(&board, &mut stdout)?;
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                cleanup_terminal(&stdout)?;
+                println!("You won! Congratulations!");
+                return Ok(());
             }
-            render_game_board(&board, &mut stdout)?;
-            std::thread::sleep(std::time::Duration::from_secs(3));
-            cleanup_terminal(&stdout)?;
-            println!("You hit a mine! Game Over!");
-            return Ok(());
+            GameState::Lost => {
+                // Reveal all mines
+                for cell in board.grid.iter_mut() {
+                    if cell.kind == CellKind::Mine {
+                        cell.state = CellState::Revealed;
+                    }
+                }
+                render_game_board(&board, &mut stdout)?;
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                cleanup_terminal(&stdout)?;
+                println!("You hit a mine! Game Over!");
+                return Ok(());
+            }
         }
 
         render_game_board(&board, &mut stdout)?;

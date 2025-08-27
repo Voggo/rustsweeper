@@ -1,6 +1,7 @@
 use rust_sweeper::{
     board::Board,
-    game::GameState,
+    game::{GameState, MENU_ITEMS_LIST, MenuItemType},
+    menu,
     tui::{self, cleanup_terminal, render_game_board, setup_terminal},
 };
 
@@ -25,23 +26,51 @@ fn should_restart(event: &Event) -> bool {
 fn main() -> Result<(), anyhow::Error> {
     let mut stdout = stdout();
     setup_terminal(&stdout)?;
-    tui::set_styles(&stdout)?;
 
     let mut board = Board::new();
-    let mut game_state = GameState::Ongoing;
+    let mut game_state = GameState::InMenu;
+    let mut current_menu_select = MENU_ITEMS_LIST[0];
 
+    tui::set_styles(&stdout)?;
     'game_loop: loop {
         match game_state {
+            GameState::InMenu => {
+                tui::render_game_menu(&mut stdout, current_menu_select)?;
+            }
             GameState::Ongoing => {
                 render_game_board(&board, &mut stdout)?;
-                let event = event::read()?;
-
-                if should_exit(&event) {
-                    break 'game_loop;
+            }
+            GameState::Won | GameState::Lost => {
+                render_game_board(&board, &mut stdout)?;
+                tui::overlay_ascii_art(&mut stdout, &board, game_state == GameState::Won)?;
+            }
+        }
+        let event = event::read()?;
+        if should_exit(&event) {
+            break 'game_loop;
+        }
+        match game_state {
+            GameState::InMenu => {
+                current_menu_select = menu::choose_menu(&event, current_menu_select);
+                if current_menu_select.selected {
+                    match current_menu_select.item_type {
+                        MenuItemType::Beginnner
+                        | MenuItemType::Intermediate
+                        | MenuItemType::Expert => {
+                            board = Board::new_with_config(current_menu_select.config);
+                            game_state = GameState::Ongoing;
+                            render_game_board(&board, &mut stdout)?;
+                            continue;
+                        }
+                        MenuItemType::Exit => {
+                            break 'game_loop;
+                        }
+                        _ => {}
+                    }
                 }
-
+            }
+            GameState::Ongoing => {
                 if let Event::Mouse(mouse_event) = event {
-                    // cursor_position = (mouse_event.row, mouse_event.column);
                     match mouse_event.kind {
                         event::MouseEventKind::Down(MouseButton::Left) => {
                             if let Some(new_state) = board.handle_mouse_left(mouse_event) {
@@ -56,16 +85,9 @@ fn main() -> Result<(), anyhow::Error> {
                 }
             }
             GameState::Won | GameState::Lost => {
-                render_game_board(&board, &mut stdout)?;
-                tui::overlay_ascii_art(&mut stdout, &board, game_state == GameState::Won)?;
-
-                let event = event::read()?;
-                if should_exit(&event) {
-                    break 'game_loop;
-                }
                 if should_restart(&event) {
-                    board = Board::new();
-                    game_state = GameState::Ongoing;
+                    current_menu_select = MENU_ITEMS_LIST[0];
+                    game_state = GameState::InMenu;
                 }
             }
         }

@@ -28,6 +28,23 @@ impl Board {
         }
     }
 
+    pub fn new_with_config(config: GameConfig) -> Board {
+        let grid = vec![
+            CellBox {
+                kind: CellKind::Number(0),
+                state: CellState::Hidden,
+            };
+            config.width * config.height
+        ];
+        Board {
+            grid,
+            width: config.width,
+            height: config.height,
+            mines_to_place: config.mines,
+            mines_placed: false,
+        }
+    }
+
     pub fn initialize_board(&mut self, initial_click_x: isize, initial_click_y: isize) {
         let mut rng = rand::rng();
         let mut set_index = (0..(self.width * self.height)).collect::<Vec<usize>>();

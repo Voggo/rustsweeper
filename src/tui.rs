@@ -1,6 +1,5 @@
 use crate::board::Board;
-use crate::game::{COLOR_CONFIG, CellKind, CellState};
-use crossterm::event::Event;
+use crate::game::{COLOR_CONFIG, CellKind, CellState, MENU_ITEMS_LIST, MenuItem};
 use crossterm::{
     cursor::{MoveTo, RestorePosition},
     event::{self, DisableMouseCapture, EnableMouseCapture},
@@ -80,7 +79,7 @@ pub fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyho
     } else {
         (rows.saturating_sub(art_height)) / 2
     };
-
+    queue!(stdout, SetAttribute(Attribute::Bold))?;
     for (i, line) in art.iter().enumerate() {
         for (j, ch) in line.chars().enumerate() {
             if ch != ' ' {
@@ -88,22 +87,46 @@ pub fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyho
                     stdout,
                     SetForegroundColor(color),
                     MoveTo(art_x + j as u16, art_y + i as u16),
-                    SetAttribute(Attribute::Bold),
                     Print(ch),
-                    // SetAttribute(Attribute::NoBold),
                 )?;
             }
         }
     }
-    queue!(stdout, SetBackgroundColor(COLOR_CONFIG.background))?;
+    queue!(
+        stdout,
+        SetBackgroundColor(COLOR_CONFIG.background),
+        // SetAttribute(Attribute::NoBold)
+    )?;
     stdout.flush()?;
     Ok(())
 }
 
 pub fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<()> {
+    let (cols, rows) = crossterm::terminal::size()?;
+    let required_width = 2 + board.width * 2;
+    let required_height = 2 + board.height;
+
+    if cols < required_width as u16 || rows < required_height as u16 {
+        // Terminal is too small, show warning message
+        let msg = "Terminal too small! Resize and try again.";
+        let x = (cols.saturating_sub(msg.len() as u16)) / 2;
+        let y = rows / 2;
+        queue!(
+            stdout,
+            Clear(terminal::ClearType::All),
+            MoveTo(x, y),
+            SetForegroundColor(Color::Red),
+            Print(msg),
+            ResetColor
+        )?;
+        stdout.flush()?;
+        return Ok(());
+    }
+
     let (board_start_x, board_start_y) = board.get_board_start_pos();
     queue!(
         stdout,
+        SetBackgroundColor(COLOR_CONFIG.background),
         Clear(terminal::ClearType::All),
         MoveTo(board_start_x, board_start_y)
     )?;
@@ -163,6 +186,57 @@ pub fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<(
         queue!(stdout, Print("──"))?;
     }
     queue!(stdout, Print("─┘"))?;
+    stdout.flush()?;
+    Ok(())
+}
+
+pub fn render_game_menu(stdout: &mut Stdout, current: MenuItem) -> anyhow::Result<()> {
+    let title_art = [
+        "  ____  _   _ ____ _____ ______        _______ _____ ____  _____ ____  ",
+        " |  _ \\| | | / ___|_   _/ ___\\ \\      / / ____| ____|  _ \\| ____|  _ \\ ",
+        " | |_) | | | \\___ \\ | | \\___ \\\\ \\ /\\ / /|  _| |  _| | |_) |  _| | |_) |",
+        " |  _ <| |_| |___) || |  ___) |\\ V  V / | |___| |___|  __/| |___|  _ < ",
+        " |_| \\_\\\\___/|____/ |_| |____/  \\_/\\_/  |_____|_____|_|   |_____|_| \\_\\",
+    ];
+
+    let (cols, rows) = crossterm::terminal::size()?;
+    let art_width = title_art[0].len() as u16;
+    let art_height = title_art.len() as u16;
+    let art_y = (rows.saturating_sub(art_height + MENU_ITEMS_LIST.len() as u16 + 2)) / 2;
+    let art_x = (cols.saturating_sub(art_width)) / 2;
+
+    queue!(
+        stdout,
+        Clear(terminal::ClearType::All),
+        SetForegroundColor(Color::Black),
+    )?;
+    // Draw ASCII art title
+    for (i, line) in title_art.iter().enumerate() {
+        queue!(stdout, MoveTo(art_x, art_y + i as u16), Print(line),)?;
+    }
+
+    for (i, item) in MENU_ITEMS_LIST.iter().enumerate() {
+        let menu_y = art_y + art_height + 1 + i as u16;
+        let menu_x = (cols.saturating_sub(item.name.len() as u16)) / 2;
+        if *item == current {
+            queue!(
+                stdout,
+                MoveTo(menu_x - 2, menu_y),
+                SetForegroundColor(Color::Yellow),
+                Print("➤ "),
+                Print(item.name),
+            )?;
+        } else {
+            queue!(
+                stdout,
+                MoveTo(menu_x - 2, menu_y),
+                SetForegroundColor(Color::DarkGrey),
+                Print("  "),
+                SetForegroundColor(Color::Black),
+                Print(item.name),
+            )?;
+        }
+    }
     stdout.flush()?;
     Ok(())
 }

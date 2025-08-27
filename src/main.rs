@@ -5,7 +5,7 @@ use std::io::{Stdout, stdout};
 
 use crossterm::terminal::Clear;
 use crossterm::{
-    cursor::{MoveTo, RestorePosition, Show},
+    cursor::{MoveTo, RestorePosition},
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers, MouseButton,
     },
@@ -48,9 +48,9 @@ struct GameConfig {
 }
 
 const GAME_CONFIG: GameConfig = GameConfig {
-    width: 30,
-    height: 30,
-    mines: 60,
+    width: 20,
+    height: 20,
+    mines: 25,
 };
 
 enum GameState {
@@ -104,14 +104,14 @@ impl Board {
         }
     }
 
-    fn place_mines(&mut self, x_zero: isize, y_zero: isize) {
+    fn initialize_board(&mut self, initial_click_x: isize, initial_click_y: isize) {
         let mut rng = rand::rng();
         let mut set_index = (0..(self.width * self.height)).collect::<Vec<usize>>();
         set_index.shuffle(&mut rng);
         for i in 0..self.mines_to_place {
             let mut idx = set_index[i];
-            if (idx % self.width) as isize == x_zero
-                && (idx as isize - x_zero) / self.width as isize == y_zero
+            if (idx % self.width) as isize == initial_click_x
+                && (idx as isize - initial_click_x) / self.width as isize == initial_click_y
             {
                 // if the random index is the same as the first clicked cell
                 // pick the next index in the shuffled list this will always be valid
@@ -229,7 +229,7 @@ impl Board {
         let cell_x = ((event.column as isize - board_start_x as isize - 2) / 2).max(0);
         let cell_y = (event.row as isize - board_start_y as isize - 1).max(0);
         if self.mines_placed == false {
-            self.place_mines(cell_x, cell_y);
+            self.initialize_board(cell_x, cell_y);
             self.mines_placed = true;
         }
         if let Some(cell) = self.get_cell_mut(cell_x, cell_y) {
@@ -274,7 +274,6 @@ impl Board {
         }
     }
 }
-
 // set up and clean up section
 fn setup_terminal(mut stdout: &Stdout) -> Result<(), std::io::Error> {
     terminal::enable_raw_mode()?;
@@ -294,13 +293,15 @@ fn set_styles(mut stdout: &Stdout) -> Result<(), std::io::Error> {
 }
 
 fn cleanup_terminal(mut stdout: &Stdout) -> Result<(), std::io::Error> {
+    while event::poll(std::time::Duration::from_millis(1))? {
+        let _ = event::read(); // Clear any pending events
+    }
     execute!(
         stdout,
-        Show,
-        LeaveAlternateScreen,
         DisableMouseCapture,
+        LeaveAlternateScreen,
         ResetColor,
-        RestorePosition
+        RestorePosition,
     )?;
     terminal::disable_raw_mode()?;
     return Ok(());
@@ -316,6 +317,8 @@ fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyhow::R
         "   \\   / _ \\| | | |   \\ \\/  \\/ / | | '_ \\ ",
         "    | | (_) | |_| |    \\  /\\  /  | | | | |",
         "    |_|\\___/ \\__,_|     \\/  \\/   |_|_| |_|",
+        " ",
+        "   Press [r] to restart or [ctrl+c] to exit.   ",
     ];
     let lose_art = [
         "  _____                         ____                 ",
@@ -324,6 +327,8 @@ fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyhow::R
         "| | |_ |/ _` | '_ ` _ \\ / _ \\ | |  | \\ \\ / / _ \\ '__|",
         "| |__| | (_| | | | | | |  __/ | |__| |\\ V /  __/ |   ",
         " \\_____|\\__,_|_| |_| |_|\\___|  \\____/  \\_/ \\___|_|   ",
+        " ",
+        "       Press [r] to restart or [ctrl+c] to exit.       ",
     ];
     let art = if win { &win_art } else { &lose_art };
     let color = if win { Color::Green } else { Color::Red };
@@ -341,12 +346,18 @@ fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyhow::R
     };
 
     for (i, line) in art.iter().enumerate() {
-        queue!(
-            stdout,
-            SetForegroundColor(color),
-            MoveTo(art_x, art_y + i as u16),
-            Print(line),
-        )?;
+        for (j, ch) in line.chars().enumerate() {
+            if ch != ' ' {
+                queue!(
+                    stdout,
+                    SetForegroundColor(color),
+                    SetAttribute(Attribute::Bold),
+                    MoveTo(art_x + j as u16, art_y + i as u16),
+                    Print(ch),
+                    SetAttribute(Attribute::Reset),
+                )?;
+            }
+        }
     }
     stdout.flush()?;
     Ok(())
@@ -432,6 +443,15 @@ fn should_exit(event: &Event) -> Result<bool, std::io::Error> {
     return Ok(false);
 }
 
+fn should_restart(event: &Event) -> Result<bool, std::io::Error> {
+    if let Event::Key(key_event) = event.to_owned() {
+        if key_event.code == KeyCode::Char('r') {
+            return Ok(true);
+        }
+    }
+    return Ok(false);
+}
+
 fn main() -> Result<(), anyhow::Error> {
     let mut stdout = stdout();
     // terminal set up
@@ -439,20 +459,20 @@ fn main() -> Result<(), anyhow::Error> {
     set_styles(&stdout)?;
     let mut board = Board::new();
     render_game_board(&board, &mut stdout)?;
+    let mut cursor_position: (u16, u16) = (0, 0);
     let mut game_state = GameState::Ongoing;
     'game_loop: loop {
         let event = event::read()?;
         if should_exit(&event)? == true {
             break 'game_loop;
         }
-
         if let Event::Mouse(event) = event {
             // Handle mouse events here if needed
             // println!("Mouse event: {:?}", event);
             match event.kind {
                 event::MouseEventKind::Moved => {
                     // Handle mouse movement if needed
-                    queue!(stdout, MoveTo(event.column, event.row))?;
+                    cursor_position = (event.column, event.row);
                 }
                 event::MouseEventKind::Down(MouseButton::Left) => {
                     if let Some(game_state_change) = board.handle_mouse_left(event) {
@@ -465,7 +485,6 @@ fn main() -> Result<(), anyhow::Error> {
                 }
                 _ => {
                     // Handle other mouse events (e.g., clicks, scrolls) if needed
-                    // todo!("Handle other mouse events: {:?}", event.kind);
                 }
             }
         }
@@ -475,10 +494,12 @@ fn main() -> Result<(), anyhow::Error> {
             GameState::Won => {
                 render_game_board(&board, &mut stdout)?;
                 overlay_ascii_art(&mut stdout, &board, true)?;
-                std::thread::sleep(std::time::Duration::from_secs(3));
-                cleanup_terminal(&stdout)?;
-                println!("You won! Congratulations!");
-                return Ok(());
+                if should_restart(&event)? == true {
+                    board = Board::new();
+                    game_state = GameState::Ongoing;
+                    render_game_board(&board, &mut stdout)?;
+                }
+                continue 'game_loop;
             }
             GameState::Lost => {
                 // Reveal all mines
@@ -489,14 +510,17 @@ fn main() -> Result<(), anyhow::Error> {
                 }
                 render_game_board(&board, &mut stdout)?;
                 overlay_ascii_art(&mut stdout, &board, false)?;
-                std::thread::sleep(std::time::Duration::from_secs(3));
-                cleanup_terminal(&stdout)?;
-                println!("You hit a mine! Game Over!");
-                return Ok(());
+                if should_restart(&event)? == true {
+                    board = Board::new();
+                    game_state = GameState::Ongoing;
+                    render_game_board(&board, &mut stdout)?;
+                }
+                continue 'game_loop;
             }
         }
 
         render_game_board(&board, &mut stdout)?;
+        execute!(stdout, MoveTo(cursor_position.0, cursor_position.1))?;
     }
     cleanup_terminal(&stdout)?;
     Ok(())

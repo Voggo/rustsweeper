@@ -1,5 +1,6 @@
 use crate::board::Board;
-use crate::game::{COLOR_CONFIG, CellKind, CellState, MENU_ITEMS_LIST, MenuItem};
+use crate::game::{COLOR_CONFIG, CellKind, CellState, MenuItemType};
+use crate::menu::Menu;
 use crossterm::{
     cursor::{MoveTo, RestorePosition},
     event::{self, DisableMouseCapture, EnableMouseCapture},
@@ -46,14 +47,14 @@ pub fn cleanup_terminal(mut stdout: &Stdout) -> Result<(), std::io::Error> {
 /// If there is room, place it above the board; otherwise, center in terminal.
 pub fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyhow::Result<()> {
     let win_art = [
-        " __     __          __          ___       ",
-        " \\ \\   / /          \\ \\        / (_)      ",
-        "  \\ \\_/ /__  _   _   \\ \\  /\\  / / _ _ __  ",
-        "   \\   / _ \\| | | |   \\ \\/  \\/ / | | '_ \\ ",
-        "    | | (_) | |_| |    \\  /\\  /  | | | | |",
-        "    |_|\\___/ \\__,_|     \\/  \\/   |_|_| |_|",
+        "   __     __          __          ___       ",
+        "   \\ \\   / /          \\ \\        / (_)      ",
+        "    \\ \\_/ /__  _   _   \\ \\  /\\  / / _ _ __  ",
+        "     \\   / _ \\| | | |   \\ \\/  \\/ / | | '_ \\ ",
+        "      | | (_) | |_| |    \\  /\\  /  | | | | |",
+        "      |_|\\___/ \\__,_|     \\/  \\/   |_|_| |_|",
         " ",
-        "   Press [r] to restart or [ctrl+c] to exit.   ",
+        "Press [m] for menu [r] to restart or [ctrl+c] to exit.   ",
     ];
     let lose_art = [
         "  _____                         ____                 ",
@@ -63,7 +64,7 @@ pub fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyho
         "| |__| | (_| | | | | | |  __/ | |__| |\\ V /  __/ |   ",
         " \\_____|\\__,_|_| |_| |_|\\___|  \\____/  \\_/ \\___|_|   ",
         " ",
-        "       Press [r] to restart or [ctrl+c] to exit.       ",
+        " Press [m] for menu [r] to restart or [ctrl+c] to exit.       ",
     ];
     let art = if win { &win_art } else { &lose_art };
     let color = if win { Color::Green } else { Color::Red };
@@ -190,7 +191,7 @@ pub fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<(
     Ok(())
 }
 
-pub fn render_game_menu(stdout: &mut Stdout, current: MenuItem) -> anyhow::Result<()> {
+pub fn render_game_menu(stdout: &mut Stdout, menu: &Menu) -> anyhow::Result<()> {
     let title_art = [
         "  ____  _   _ ____ _____ ______        _______ _____ ____  _____ ____  ",
         " |  _ \\| | | / ___|_   _/ ___\\ \\      / / ____| ____|  _ \\| ____|  _ \\ ",
@@ -202,7 +203,7 @@ pub fn render_game_menu(stdout: &mut Stdout, current: MenuItem) -> anyhow::Resul
     let (cols, rows) = crossterm::terminal::size()?;
     let art_width = title_art[0].len() as u16;
     let art_height = title_art.len() as u16;
-    let art_y = (rows.saturating_sub(art_height + MENU_ITEMS_LIST.len() as u16 + 2)) / 2;
+    let art_y = (rows.saturating_sub(art_height + menu.len() as u16 + 2)) / 2;
     let art_x = (cols.saturating_sub(art_width)) / 2;
 
     queue!(
@@ -214,11 +215,59 @@ pub fn render_game_menu(stdout: &mut Stdout, current: MenuItem) -> anyhow::Resul
     for (i, line) in title_art.iter().enumerate() {
         queue!(stdout, MoveTo(art_x, art_y + i as u16), Print(line),)?;
     }
+    if menu.get_hovered_item().item_type == MenuItemType::Custom {
+        render_custom_config_menu(stdout, &menu, cols, art_height, art_y)?;
+        return Ok(());
+    } else {
+        render_main_menu(stdout, &menu, cols, art_height, art_y)?;
+        Ok(())
+    }
+}
 
-    for (i, item) in MENU_ITEMS_LIST.iter().enumerate() {
+fn render_main_menu(
+    stdout: &mut Stdout,
+    menu: &Menu,
+    cols: u16,
+    art_height: u16,
+    art_y: u16,
+) -> Result<(), anyhow::Error> {
+    for (i, item) in menu.items.iter().enumerate() {
         let menu_y = art_y + art_height + 1 + i as u16;
         let menu_x = (cols.saturating_sub(item.name.len() as u16)) / 2;
-        if *item == current {
+        if item == menu.get_hovered_item() {
+            queue!(
+                stdout,
+                MoveTo(menu_x - 2, menu_y),
+                SetForegroundColor(Color::Yellow),
+                Print("➤ "),
+                Print(item.name),
+            )?;
+        } else {
+            queue!(
+                stdout,
+                MoveTo(menu_x - 2, menu_y),
+                SetForegroundColor(Color::DarkGrey),
+                Print("  "),
+                SetForegroundColor(Color::Black),
+                Print(item.name),
+            )?;
+        }
+    }
+    stdout.flush()?;
+    Ok(())
+}
+
+fn render_custom_config_menu(
+    stdout: &mut Stdout,
+    menu: &Menu,
+    cols: u16,
+    art_height: u16,
+    art_y: u16,
+) -> Result<(), anyhow::Error> {
+    for (i, item) in menu.items.iter().enumerate() {
+        let menu_y = art_y + art_height + 1 + i as u16;
+        let menu_x = (cols.saturating_sub(item.name.len() as u16)) / 2;
+        if item == menu.get_hovered_item() {
             queue!(
                 stdout,
                 MoveTo(menu_x - 2, menu_y),

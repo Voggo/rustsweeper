@@ -1,7 +1,7 @@
 use rust_sweeper::{
     board::Board,
-    game::{GameState, MENU_ITEMS_LIST, MenuItemType},
-    menu,
+    game::{GameState, MenuItem, MenuItemType},
+    menu::{self, Menu},
     tui::{self, cleanup_terminal, render_game_board, setup_terminal},
 };
 
@@ -23,19 +23,29 @@ fn should_restart(event: &Event) -> bool {
     )
 }
 
+fn should_menu(event: &Event) -> bool {
+    matches!(
+        event,
+        Event::Key(key_event) if key_event.code == KeyCode::Char('m')
+    )
+}
+
 fn main() -> Result<(), anyhow::Error> {
     let mut stdout = stdout();
     setup_terminal(&stdout)?;
 
     let mut board = Board::new();
-    let mut game_state = GameState::InMenu;
-    let mut current_menu_select = MENU_ITEMS_LIST[0];
-
+    let mut game_state = GameState::MainMenu;
+    let mut main_menu = Menu::new_main_menu();
+    let mut custom_menu = Menu::new_custom_menu();
     tui::set_styles(&stdout)?;
     'game_loop: loop {
         match game_state {
-            GameState::InMenu => {
-                tui::render_game_menu(&mut stdout, current_menu_select)?;
+            GameState::MainMenu => {
+                tui::render_game_menu(&mut stdout, &main_menu)?;
+            }
+            GameState::CustomMenu => {
+                tui::render_game_menu(&mut stdout, &custom_menu)?;
             }
             GameState::Ongoing => {
                 render_game_board(&board, &mut stdout)?;
@@ -50,25 +60,32 @@ fn main() -> Result<(), anyhow::Error> {
             break 'game_loop;
         }
         match game_state {
-            GameState::InMenu => {
-                current_menu_select = menu::choose_menu(&event, current_menu_select);
-                if current_menu_select.selected {
-                    match current_menu_select.item_type {
+            GameState::MainMenu => {
+                menu::handle_menu_event(&event, &mut main_menu);
+                if let Some(item) = main_menu.selected {
+                    match item.item_type {
                         MenuItemType::Beginnner
                         | MenuItemType::Intermediate
                         | MenuItemType::Expert => {
-                            board = Board::new_with_config(current_menu_select.config);
+                            // safe to unwrap based on a const assignment in menu.rs
+                            board = Board::new_with_config(item.config.unwrap());
                             game_state = GameState::Ongoing;
-                            render_game_board(&board, &mut stdout)?;
                             continue;
                         }
                         MenuItemType::Exit => {
                             break 'game_loop;
                         }
-                        _ => {}
+                        MenuItemType::Custom => {
+                            game_state = GameState::CustomMenu;
+                            continue; // not implemented
+                        }
                     }
                 }
             }
+            GameState::CustomMenu => {
+                menu::handle_menu_event(&event, &mut custom_menu);
+            }
+
             GameState::Ongoing => {
                 if let Event::Mouse(mouse_event) = event {
                     match mouse_event.kind {
@@ -86,8 +103,10 @@ fn main() -> Result<(), anyhow::Error> {
             }
             GameState::Won | GameState::Lost => {
                 if should_restart(&event) {
-                    current_menu_select = MENU_ITEMS_LIST[0];
-                    game_state = GameState::InMenu;
+                    game_state = GameState::Ongoing;
+                } else if should_menu(&event) {
+                    game_state = GameState::MainMenu;
+                    main_menu = menu::Menu::new_main_menu();
                 }
             }
         }

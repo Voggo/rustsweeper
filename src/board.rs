@@ -17,13 +17,13 @@ impl Board {
                 kind: CellKind::Number(0),
                 state: CellState::Hidden,
             };
-            GAME_CONFIG.width * GAME_CONFIG.height
+            DEFAULT_CONFIG.width * DEFAULT_CONFIG.height
         ];
         Board {
             grid,
-            width: GAME_CONFIG.width,
-            height: GAME_CONFIG.height,
-            mines_to_place: GAME_CONFIG.mines,
+            width: DEFAULT_CONFIG.width,
+            height: DEFAULT_CONFIG.height,
+            mines_to_place: DEFAULT_CONFIG.mines,
             mines_placed: false,
         }
     }

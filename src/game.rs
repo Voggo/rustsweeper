@@ -3,7 +3,8 @@ use ::crossterm::style::Color;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameState {
-    InMenu,
+    MainMenu,
+    CustomMenu,
     Ongoing,
     Won,
     Lost,
@@ -35,8 +36,7 @@ pub enum MenuItemType {
 pub struct MenuItem {
     pub item_type: MenuItemType,
     pub name: &'static str,
-    pub config: GameConfig,
-    pub selected: bool,
+    pub config: Option<GameConfig>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,60 +62,8 @@ pub struct ColorConfig {
     pub border: Color,
 }
 
-pub const MENU_ITEMS_LIST: [MenuItem; 5] = [
-    MenuItem {
-        item_type: MenuItemType::Beginnner,
-        name: "Beginner",
-        config: GameConfig {
-            width: 9,
-            height: 9,
-            mines: 10,
-        },
-        selected: false,
-    },
-    MenuItem {
-        item_type: MenuItemType::Intermediate,
-        name: "Intermediate",
-        config: GameConfig {
-            width: 16,
-            height: 16,
-            mines: 40,
-        },
-        selected: false,
-    },
-    MenuItem {
-        item_type: MenuItemType::Expert,
-        name: "Expert",
-        config: GameConfig {
-            width: 30,
-            height: 16,
-            mines: 99,
-        },
-        selected: false,
-    },
-    MenuItem {
-        item_type: MenuItemType::Custom,
-        name: "Custom",
-        config: GameConfig {
-            width: 20,
-            height: 20,
-            mines: 25,
-        },
-        selected: false,
-    },
-    MenuItem {
-        item_type: MenuItemType::Exit,
-        name: "Exit",
-        config: GameConfig {
-            width: 0,
-            height: 0,
-            mines: 0,
-        },
-        selected: false,
-    },
-];
-
-pub const GAME_CONFIG: GameConfig = GameConfig {
+pub const DEFAULT_CONFIG: GameConfig = GameConfig {
+    // fallback config
     width: 20,
     height: 20,
     mines: 25,

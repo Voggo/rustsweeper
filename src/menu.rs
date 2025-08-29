@@ -68,7 +68,7 @@ pub fn handle_menu_event(event: &event::Event, menu: &mut Menu) {
 }
 
 const MAIN_MENU_ITEMS_LIST: [MenuItem; 5] = [
-    MenuItem {
+    MenuItem::Main {
         item_type: MenuItemType::Beginnner,
         name: "Beginner",
         config: Some(GameConfig {
@@ -77,7 +77,7 @@ const MAIN_MENU_ITEMS_LIST: [MenuItem; 5] = [
             mines: 10,
         }),
     },
-    MenuItem {
+    MenuItem::Main {
         item_type: MenuItemType::Intermediate,
         name: "Intermediate",
         config: Some(GameConfig {
@@ -86,7 +86,7 @@ const MAIN_MENU_ITEMS_LIST: [MenuItem; 5] = [
             mines: 40,
         }),
     },
-    MenuItem {
+    MenuItem::Main {
         item_type: MenuItemType::Expert,
         name: "Expert",
         config: Some(GameConfig {
@@ -95,12 +95,12 @@ const MAIN_MENU_ITEMS_LIST: [MenuItem; 5] = [
             mines: 99,
         }),
     },
-    MenuItem {
+    MenuItem::Main {
         item_type: MenuItemType::Custom,
         name: "Custom",
         config: None,
     },
-    MenuItem {
+    MenuItem::Main {
         item_type: MenuItemType::Exit,
         name: "Exit",
         config: None,
@@ -108,19 +108,19 @@ const MAIN_MENU_ITEMS_LIST: [MenuItem; 5] = [
 ];
 
 const CUSTOM_MENU_ITEMS_LIST: [MenuItem; 3] = [
-    MenuItem {
-        item_type: MenuItemType::Custom,
+    MenuItem::Custom {
+        item_type: MenuItemType::Width,
         name: "Width",
-        config: None,
+        value: 10,
     },
-    MenuItem {
-        item_type: MenuItemType::Custom,
+    MenuItem::Custom {
+        item_type: MenuItemType::Width,
         name: "Height",
-        config: None,
+        value: 10,
     },
-    MenuItem {
-        item_type: MenuItemType::Custom,
+    MenuItem::Custom {
+        item_type: MenuItemType::Mines,
         name: "Mines",
-        config: None,
+        value: 10,
     },
 ];

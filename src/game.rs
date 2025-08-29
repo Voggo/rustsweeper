@@ -3,8 +3,7 @@ use ::crossterm::style::Color;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameState {
-    MainMenu,
-    CustomMenu,
+    Menu,
     Ongoing,
     Won,
     Lost,
@@ -30,13 +29,23 @@ pub enum MenuItemType {
     Expert,
     Custom,
     Exit,
+    Width,
+    Height,
+    Mines,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct MenuItem {
-    pub item_type: MenuItemType,
-    pub name: &'static str,
-    pub config: Option<GameConfig>,
+pub enum MenuItem {
+    Main {
+        item_type: MenuItemType,
+        name: &'static str,
+        config: Option<GameConfig>,
+    },
+    Custom {
+        item_type: MenuItemType,
+        name: &'static str,
+        value: usize,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -35,17 +35,15 @@ fn main() -> Result<(), anyhow::Error> {
     setup_terminal(&stdout)?;
 
     let mut board = Board::new();
-    let mut game_state = GameState::MainMenu;
-    let mut main_menu = Menu::new_main_menu();
-    let mut custom_menu = Menu::new_custom_menu();
+    let mut game_state = GameState::Menu;
+    let main_menu = Menu::new_main_menu();
+    let custom_menu = Menu::new_custom_menu();
+    let mut current_menu = Box::new(main_menu);
     tui::set_styles(&stdout)?;
     'game_loop: loop {
         match game_state {
-            GameState::MainMenu => {
-                tui::render_game_menu(&mut stdout, &main_menu)?;
-            }
-            GameState::CustomMenu => {
-                tui::render_game_menu(&mut stdout, &custom_menu)?;
+            GameState::Menu => {
+                tui::render_game_menu(&mut stdout, &current_menu.clone())?;
             }
             GameState::Ongoing => {
                 render_game_board(&board, &mut stdout)?;
@@ -60,30 +58,37 @@ fn main() -> Result<(), anyhow::Error> {
             break 'game_loop;
         }
         match game_state {
-            GameState::MainMenu => {
-                menu::handle_menu_event(&event, &mut main_menu);
-                if let Some(item) = main_menu.selected {
-                    match item.item_type {
-                        MenuItemType::Beginnner
-                        | MenuItemType::Intermediate
-                        | MenuItemType::Expert => {
-                            // safe to unwrap based on a const assignment in menu.rs
-                            board = Board::new_with_config(item.config.unwrap());
-                            game_state = GameState::Ongoing;
-                            continue;
-                        }
-                        MenuItemType::Exit => {
-                            break 'game_loop;
-                        }
-                        MenuItemType::Custom => {
-                            game_state = GameState::CustomMenu;
+            GameState::Menu => {
+                menu::handle_menu_event(&event, &mut *current_menu);
+                if let Some(item) = current_menu.selected {
+                    match item {
+                        MenuItem::Main {
+                            item_type, config, ..
+                        } => match item_type {
+                            MenuItemType::Beginnner
+                            | MenuItemType::Intermediate
+                            | MenuItemType::Expert => {
+                                // safe to unwrap based on a const assignment in menu.rs
+                                board = Board::new_with_config(config.unwrap());
+                                game_state = GameState::Ongoing;
+                                continue;
+                            }
+                            MenuItemType::Custom => {
+                                current_menu = Box::new(custom_menu.clone());
+                                continue;
+                            }
+                            MenuItemType::Exit => {
+                                break 'game_loop;
+                            }
+                            _ => {
+                                continue; // not implemented
+                            }
+                        },
+                        MenuItem::Custom { .. } => {
                             continue; // not implemented
                         }
                     }
                 }
-            }
-            GameState::CustomMenu => {
-                menu::handle_menu_event(&event, &mut custom_menu);
             }
 
             GameState::Ongoing => {
@@ -105,8 +110,8 @@ fn main() -> Result<(), anyhow::Error> {
                 if should_restart(&event) {
                     game_state = GameState::Ongoing;
                 } else if should_menu(&event) {
-                    game_state = GameState::MainMenu;
-                    main_menu = menu::Menu::new_main_menu();
+                    game_state = GameState::Menu;
+                    current_menu = Box::new(menu::Menu::new_main_menu());
                 }
             }
         }

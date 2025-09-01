@@ -32,6 +32,7 @@ pub enum MenuItemType {
     Width,
     Height,
     Mines,
+    Confirm,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -70,6 +71,12 @@ pub struct ColorConfig {
     pub number: [Color; 8],
     pub border: Color,
 }
+
+pub const MIN_WIDTH: usize = 5;
+pub const MAX_WIDTH: usize = 50;
+pub const MIN_HEIGHT: usize = 5;
+pub const MAX_HEIGHT: usize = 50;
+pub const MIN_MINES: usize = 1;
 
 pub const DEFAULT_CONFIG: GameConfig = GameConfig {
     // fallback config

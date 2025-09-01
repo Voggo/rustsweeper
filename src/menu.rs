@@ -57,10 +57,36 @@ pub fn handle_menu_event(event: &event::Event, menu: &mut Menu) {
                 menu.select();
             }
             event::KeyCode::Right => {
-                todo!("Handle right key for custom menu");
+                // Increase value for custom menu item
+                if let MenuItem::Custom {
+                    item_type,
+                    name,
+                    value,
+                } = menu.items[menu.hovered_index]
+                {
+                    let new_value = value.saturating_add(1); // or set a max limit
+                    menu.items[menu.hovered_index] = MenuItem::Custom {
+                        item_type,
+                        name,
+                        value: new_value,
+                    };
+                }
             }
             event::KeyCode::Left => {
-                todo!("Handle left key for custom menu");
+                // Decrease value for custom menu item
+                if let MenuItem::Custom {
+                    item_type,
+                    name,
+                    value,
+                } = menu.items[menu.hovered_index]
+                {
+                    let new_value = value.saturating_sub(1).max(1); // or set a min limit
+                    menu.items[menu.hovered_index] = MenuItem::Custom {
+                        item_type,
+                        name,
+                        value: new_value,
+                    };
+                }
             }
             _ => {}
         }
@@ -72,9 +98,9 @@ const MAIN_MENU_ITEMS_LIST: [MenuItem; 5] = [
         item_type: MenuItemType::Beginnner,
         name: "Beginner",
         config: Some(GameConfig {
-            width: 9,
-            height: 9,
-            mines: 10,
+            width: 10,
+            height: 10,
+            mines: 15,
         }),
     },
     MenuItem::Main {
@@ -107,7 +133,7 @@ const MAIN_MENU_ITEMS_LIST: [MenuItem; 5] = [
     },
 ];
 
-const CUSTOM_MENU_ITEMS_LIST: [MenuItem; 3] = [
+const CUSTOM_MENU_ITEMS_LIST: [MenuItem; 4] = [
     MenuItem::Custom {
         item_type: MenuItemType::Width,
         name: "Width",
@@ -122,5 +148,10 @@ const CUSTOM_MENU_ITEMS_LIST: [MenuItem; 3] = [
         item_type: MenuItemType::Mines,
         name: "Mines",
         value: 10,
+    },
+    MenuItem::Main {
+        item_type: MenuItemType::Confirm,
+        name: "Confirm",
+        config: None,
     },
 ];

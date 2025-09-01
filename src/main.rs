@@ -43,7 +43,7 @@ fn main() -> Result<(), anyhow::Error> {
     'game_loop: loop {
         match game_state {
             GameState::Menu => {
-                tui::render_game_menu(&mut stdout, &current_menu.clone())?;
+                tui::render_game_menu(&mut stdout, &current_menu.clone())?; // todo: avoid clone
             }
             GameState::Ongoing => {
                 render_game_board(&board, &mut stdout)?;
@@ -77,6 +77,64 @@ fn main() -> Result<(), anyhow::Error> {
                                 current_menu = Box::new(custom_menu.clone());
                                 continue;
                             }
+                            MenuItemType::Confirm => {
+                                // safe to unwrap based on menu logic
+                                let width = if let MenuItem::Custom {
+                                    item_type: MenuItemType::Width,
+                                    value,
+                                    ..
+                                } = current_menu.items[0]
+                                {
+                                    value
+                                } else {
+                                    9
+                                };
+                                let height = if let MenuItem::Custom {
+                                    item_type: MenuItemType::Height,
+                                    value,
+                                    ..
+                                } = current_menu.items[1]
+                                {
+                                    value
+                                } else {
+                                    9
+                                };
+                                let mines = if let MenuItem::Custom {
+                                    item_type: MenuItemType::Mines,
+                                    value,
+                                    ..
+                                } = current_menu.items[2]
+                                {
+                                    value
+                                } else {
+                                    10
+                                };
+                                // Validate custom config
+                                if mines >= width * height {
+                                    // Invalid config, reset to default custom values
+                                    current_menu.items[0] = MenuItem::Custom {
+                                        item_type: MenuItemType::Width,
+                                        name: "Width",
+                                        value: 9,
+                                    };
+                                    current_menu.items[1] = MenuItem::Custom {
+                                        item_type: MenuItemType::Height,
+                                        name: "Height",
+                                        value: 9,
+                                    };
+                                    current_menu.items[2] = MenuItem::Custom {
+                                        item_type: MenuItemType::Mines,
+                                        name: "Mines",
+                                        value: 10,
+                                    };
+                                    continue; // stay in custom menu
+                                }
+                                board = Board::new_with_config(Board::clamp_config(
+                                    width, height, mines,
+                                ));
+                                game_state = GameState::Ongoing;
+                                continue;
+                            }
                             MenuItemType::Exit => {
                                 break 'game_loop;
                             }
@@ -107,8 +165,10 @@ fn main() -> Result<(), anyhow::Error> {
                 }
             }
             GameState::Won | GameState::Lost => {
+                board.all_mines_revealed();
                 if should_restart(&event) {
                     game_state = GameState::Ongoing;
+                    board.reset();
                 } else if should_menu(&event) {
                     game_state = GameState::Menu;
                     current_menu = Box::new(menu::Menu::new_main_menu());

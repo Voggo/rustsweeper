@@ -76,6 +76,14 @@ impl Board {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.grid.iter_mut().for_each(|cell| {
+            cell.kind = CellKind::Number(0);
+            cell.state = CellState::Hidden;
+        });
+        self.mines_placed = false;
+    }
+
     pub fn get_cell(&self, x: isize, y: isize) -> Option<&CellBox> {
         if x >= 0 && x < self.width as isize && y >= 0 && y < self.height as isize {
             let index = y * self.width as isize + x;
@@ -164,6 +172,13 @@ impl Board {
         }
         return ret;
     }
+    pub fn all_mines_revealed(&mut self) {
+        for cell in self.grid.iter_mut() {
+            if cell.kind == CellKind::Mine {
+                cell.state = CellState::Revealed;
+            }
+        }
+    }
     pub fn handle_mouse_left(&mut self, event: event::MouseEvent) -> Option<GameState> {
         let (board_start_x, board_start_y) = self.get_board_start_pos();
         // Offset mouse coordinates by border (1 for top, 2 for left: border + space)
@@ -208,6 +223,17 @@ impl Board {
                 CellState::Flagged => CellState::Hidden,
                 _ => cell.state, // Do nothing if it's already revealed
             };
+        }
+    }
+    pub fn clamp_config(width: usize, height: usize, mines: usize) -> GameConfig {
+        let clamped_width = width.clamp(MIN_WIDTH, MAX_WIDTH);
+        let clamped_height = height.clamp(MIN_HEIGHT, MAX_HEIGHT);
+        let max_mines = clamped_width * clamped_height - 1; // Ensure at least one cell is free
+        let clamped_mines = mines.clamp(MIN_MINES, max_mines);
+        GameConfig {
+            width: clamped_width,
+            height: clamped_height,
+            mines: clamped_mines,
         }
     }
 }

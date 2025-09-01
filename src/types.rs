@@ -1,4 +1,3 @@
-// should maybe just be renamed to types.rs or something
 use ::crossterm::style::Color;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -7,6 +6,7 @@ pub enum GameState {
     Ongoing,
     Won,
     Lost,
+    Exit,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

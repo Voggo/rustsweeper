@@ -1,4 +1,4 @@
-use crate::game::*;
+use crate::types::*;
 use crossterm::event;
 use rand::prelude::*;
 
@@ -179,50 +179,64 @@ impl Board {
             }
         }
     }
-    pub fn handle_mouse_left(&mut self, event: event::MouseEvent) -> Option<GameState> {
+    fn cell_coords_from_mouse(&self, event: event::MouseEvent) -> Option<(isize, isize)> {
         let (board_start_x, board_start_y) = self.get_board_start_pos();
-        // Offset mouse coordinates by border (1 for top, 2 for left: border + space)
-        let cell_x = ((event.column as isize - board_start_x as isize - 2) / 2).max(0);
-        let cell_y = (event.row as isize - board_start_y as isize - 1).max(0);
-        if self.mines_placed == false {
-            self.initialize_board(cell_x, cell_y);
-            self.mines_placed = true;
+
+        let cell_x = (event.column as isize - board_start_x as isize - 2) / 2;
+        let cell_y = event.row as isize - board_start_y as isize - 1;
+
+        if cell_x >= 0
+            && cell_x < self.width as isize
+            && cell_y >= 0
+            && cell_y < self.height as isize
+        {
+            Some((cell_x, cell_y))
+        } else {
+            None // Click was outside the board
         }
-        if let Some(cell) = self.get_cell_mut(cell_x, cell_y) {
-            match cell.state {
-                CellState::Hidden => {
-                    // Only reveal if the cell is hidden
-                    if let Some(game_state_change) = self.reveal_adjacent_empty(cell_x, cell_y) {
-                        return Some(game_state_change);
-                    };
-                }
-                CellState::Revealed => {
-                    // If already revealed, reveal adjacent non-flagged cells if it's a number
-                    if let CellKind::Number(n) = cell.kind {
-                        if n > 0 {
-                            if let Some(game_state_change) = self.reveal_non_flagged(cell_x, cell_y)
-                            {
-                                return Some(game_state_change);
-                            };
+    }
+    pub fn handle_mouse_left(&mut self, event: event::MouseEvent) -> Option<GameState> {
+        if let Some((cell_x, cell_y)) = self.cell_coords_from_mouse(event) {
+            if self.mines_placed == false {
+                self.initialize_board(cell_x, cell_y);
+                self.mines_placed = true;
+            }
+            if let Some(cell) = self.get_cell_mut(cell_x, cell_y) {
+                match cell.state {
+                    CellState::Hidden => {
+                        // Only reveal if the cell is hidden
+                        if let Some(game_state_change) = self.reveal_adjacent_empty(cell_x, cell_y)
+                        {
+                            return Some(game_state_change);
+                        };
+                    }
+                    CellState::Revealed => {
+                        // If already revealed, reveal adjacent non-flagged cells if it's a number
+                        if let CellKind::Number(n) = cell.kind {
+                            if n > 0 {
+                                if let Some(game_state_change) =
+                                    self.reveal_non_flagged(cell_x, cell_y)
+                                {
+                                    return Some(game_state_change);
+                                };
+                            }
                         }
                     }
-                }
-                _ => (), // Do nothing if it's already revealed or flagged
-            };
+                    _ => (), // Do nothing if it's already revealed or flagged
+                };
+            }
         }
         None
     }
     pub fn handle_mouse_right(&mut self, event: event::MouseEvent) {
-        let (board_start_x, board_start_y) = self.get_board_start_pos();
-        // Offset mouse coordinates by border (1 for top, 2 for left: border + space)
-        let cell_x = ((event.column as isize - board_start_x as isize - 2) / 2).max(0);
-        let cell_y = (event.row as isize - board_start_y as isize - 1).max(0);
-        if let Some(cell) = self.get_cell_mut(cell_x, cell_y) {
-            cell.state = match cell.state {
-                CellState::Hidden => CellState::Flagged,
-                CellState::Flagged => CellState::Hidden,
-                _ => cell.state, // Do nothing if it's already revealed
-            };
+        if let Some((cell_x, cell_y)) = self.cell_coords_from_mouse(event) {
+            if let Some(cell) = self.get_cell_mut(cell_x, cell_y) {
+                cell.state = match cell.state {
+                    CellState::Hidden => CellState::Flagged,
+                    CellState::Flagged => CellState::Hidden,
+                    _ => cell.state, // Do nothing if it's already revealed
+                };
+            }
         }
     }
     pub fn clamp_config(width: usize, height: usize, mines: usize) -> GameConfig {

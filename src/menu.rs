@@ -1,4 +1,5 @@
-use crate::game::{GameConfig, MenuItem, MenuItemType};
+use crate::game_logic::Board;
+use crate::types::{GameConfig, GameState, MenuItem, MenuItemType};
 use crossterm::event;
 
 #[derive(Debug, Clone)]
@@ -41,6 +42,32 @@ impl Menu {
     }
     pub fn len(&self) -> usize {
         self.items.len()
+    }
+    pub fn get_custom_config(&self) -> Option<GameConfig> {
+        let mut config = GameConfig {
+            width: 0,
+            height: 0,
+            mines: 0,
+        };
+        for item in &self.items {
+            if let MenuItem::Custom {
+                item_type, value, ..
+            } = item
+            {
+                match item_type {
+                    MenuItemType::Width => config.width = *value,
+                    MenuItemType::Height => config.height = *value,
+                    MenuItemType::Mines => config.mines = *value,
+                    _ => {}
+                }
+            }
+        }
+        // Check if all values were found
+        if config.width > 0 && config.height > 0 {
+            Some(config)
+        } else {
+            None
+        }
     }
 }
 
@@ -93,14 +120,58 @@ pub fn handle_menu_event(event: &event::Event, menu: &mut Menu) {
     }
 }
 
+pub fn process_menu_selection(
+    current_menu: &mut Menu,
+    board: &mut Board,
+    game_state: &mut GameState,
+) {
+    if let Some(item) = current_menu.selected {
+        match item {
+            MenuItem::Main {
+                item_type, config, ..
+            } => match item_type {
+                MenuItemType::Beginnner | MenuItemType::Intermediate | MenuItemType::Expert => {
+                    *board = Board::new_with_config(config.unwrap());
+                    *game_state = GameState::Ongoing;
+                }
+                MenuItemType::Custom => {
+                    *current_menu = Menu::new_custom_menu();
+                }
+                MenuItemType::Exit => {
+                    *game_state = GameState::Exit; // Or some exit state
+                }
+                MenuItemType::Confirm => {
+                    if let Some(config) = current_menu.get_custom_config() {
+                        if config.mines >= config.width * config.height {
+                            // Handle error: maybe reset menu to defaults
+                            // Or better yet, prevent this state in the key handlers!
+                            return;
+                        }
+                        *board = Board::new_with_config(Board::clamp_config(
+                            config.width,
+                            config.height,
+                            config.mines,
+                        ));
+                        *game_state = GameState::Ongoing;
+                    }
+                }
+                _ => {}
+            },
+            MenuItem::Custom { .. } => {
+                // Do nothing for now
+            }
+        }
+    }
+}
+
 const MAIN_MENU_ITEMS_LIST: [MenuItem; 5] = [
     MenuItem::Main {
         item_type: MenuItemType::Beginnner,
         name: "Beginner",
         config: Some(GameConfig {
-            width: 10,
-            height: 10,
-            mines: 15,
+            width: 9,
+            height: 9,
+            mines: 10,
         }),
     },
     MenuItem::Main {
@@ -137,17 +208,17 @@ const CUSTOM_MENU_ITEMS_LIST: [MenuItem; 4] = [
     MenuItem::Custom {
         item_type: MenuItemType::Width,
         name: "Width",
-        value: 10,
+        value: 30,
     },
     MenuItem::Custom {
-        item_type: MenuItemType::Width,
+        item_type: MenuItemType::Height,
         name: "Height",
-        value: 10,
+        value: 30,
     },
     MenuItem::Custom {
         item_type: MenuItemType::Mines,
         name: "Mines",
-        value: 10,
+        value: 150,
     },
     MenuItem::Main {
         item_type: MenuItemType::Confirm,

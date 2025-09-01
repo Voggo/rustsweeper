@@ -1,8 +1,8 @@
 use rust_sweeper::{
-    board::Board,
-    game::{GameState, MenuItem, MenuItemType},
+    game_logic::Board,
     menu::{self, Menu},
     tui::{self, cleanup_terminal, render_game_board, setup_terminal},
+    types::GameState,
 };
 
 use crossterm::event::{self, Event, KeyCode, KeyModifiers, MouseButton};
@@ -37,13 +37,12 @@ fn main() -> Result<(), anyhow::Error> {
     let mut board = Board::new();
     let mut game_state = GameState::Menu;
     let main_menu = Menu::new_main_menu();
-    let custom_menu = Menu::new_custom_menu();
     let mut current_menu = Box::new(main_menu);
     tui::set_styles(&stdout)?;
     'game_loop: loop {
         match game_state {
             GameState::Menu => {
-                tui::render_game_menu(&mut stdout, &current_menu.clone())?; // todo: avoid clone
+                tui::render_game_menu(&mut stdout, &current_menu)?;
             }
             GameState::Ongoing => {
                 render_game_board(&board, &mut stdout)?;
@@ -51,6 +50,9 @@ fn main() -> Result<(), anyhow::Error> {
             GameState::Won | GameState::Lost => {
                 render_game_board(&board, &mut stdout)?;
                 tui::overlay_ascii_art(&mut stdout, &board, game_state == GameState::Won)?;
+            }
+            GameState::Exit => {
+                break 'game_loop;
             }
         }
         let event = event::read()?;
@@ -60,95 +62,14 @@ fn main() -> Result<(), anyhow::Error> {
         match game_state {
             GameState::Menu => {
                 menu::handle_menu_event(&event, &mut *current_menu);
-                if let Some(item) = current_menu.selected {
-                    match item {
-                        MenuItem::Main {
-                            item_type, config, ..
-                        } => match item_type {
-                            MenuItemType::Beginnner
-                            | MenuItemType::Intermediate
-                            | MenuItemType::Expert => {
-                                // safe to unwrap based on a const assignment in menu.rs
-                                board = Board::new_with_config(config.unwrap());
-                                game_state = GameState::Ongoing;
-                                continue;
-                            }
-                            MenuItemType::Custom => {
-                                current_menu = Box::new(custom_menu.clone());
-                                continue;
-                            }
-                            MenuItemType::Confirm => {
-                                // safe to unwrap based on menu logic
-                                let width = if let MenuItem::Custom {
-                                    item_type: MenuItemType::Width,
-                                    value,
-                                    ..
-                                } = current_menu.items[0]
-                                {
-                                    value
-                                } else {
-                                    9
-                                };
-                                let height = if let MenuItem::Custom {
-                                    item_type: MenuItemType::Height,
-                                    value,
-                                    ..
-                                } = current_menu.items[1]
-                                {
-                                    value
-                                } else {
-                                    9
-                                };
-                                let mines = if let MenuItem::Custom {
-                                    item_type: MenuItemType::Mines,
-                                    value,
-                                    ..
-                                } = current_menu.items[2]
-                                {
-                                    value
-                                } else {
-                                    10
-                                };
-                                // Validate custom config
-                                if mines >= width * height {
-                                    // Invalid config, reset to default custom values
-                                    current_menu.items[0] = MenuItem::Custom {
-                                        item_type: MenuItemType::Width,
-                                        name: "Width",
-                                        value: 9,
-                                    };
-                                    current_menu.items[1] = MenuItem::Custom {
-                                        item_type: MenuItemType::Height,
-                                        name: "Height",
-                                        value: 9,
-                                    };
-                                    current_menu.items[2] = MenuItem::Custom {
-                                        item_type: MenuItemType::Mines,
-                                        name: "Mines",
-                                        value: 10,
-                                    };
-                                    continue; // stay in custom menu
-                                }
-                                board = Board::new_with_config(Board::clamp_config(
-                                    width, height, mines,
-                                ));
-                                game_state = GameState::Ongoing;
-                                continue;
-                            }
-                            MenuItemType::Exit => {
-                                break 'game_loop;
-                            }
-                            _ => {
-                                continue; // not implemented
-                            }
-                        },
-                        MenuItem::Custom { .. } => {
-                            continue; // not implemented
-                        }
-                    }
+                menu::process_menu_selection(&mut *current_menu, &mut board, &mut game_state);
+                if game_state == GameState::Ongoing {
+                    continue;
+                }
+                if game_state == GameState::Lost {
+                    break 'game_loop;
                 }
             }
-
             GameState::Ongoing => {
                 if let Event::Mouse(mouse_event) = event {
                     match mouse_event.kind {
@@ -173,6 +94,9 @@ fn main() -> Result<(), anyhow::Error> {
                     game_state = GameState::Menu;
                     current_menu = Box::new(menu::Menu::new_main_menu());
                 }
+            }
+            GameState::Exit => {
+                break 'game_loop;
             }
         }
     }

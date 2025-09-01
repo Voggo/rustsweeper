@@ -1,6 +1,6 @@
-use crate::board::Board;
-use crate::game::{COLOR_CONFIG, CellKind, CellState, MenuItem, MenuItemType};
+use crate::game_logic::Board;
 use crate::menu::Menu;
+use crate::types::{COLOR_CONFIG, CellKind, CellState};
 use crossterm::{
     cursor::{MoveTo, RestorePosition},
     event::{self, DisableMouseCapture, EnableMouseCapture},
@@ -227,9 +227,9 @@ pub fn render_menu(
     art_y: u16,
 ) -> Result<(), anyhow::Error> {
     for (i, item) in menu.items.iter().enumerate() {
-        let (label, highlight) = match item {
-            crate::game::MenuItem::Main { name, .. } => (name.to_string(), false),
-            crate::game::MenuItem::Custom { name, value, .. } => {
+        let (label, _highlight) = match item {
+            crate::types::MenuItem::Main { name, .. } => (name.to_string(), false),
+            crate::types::MenuItem::Custom { name, value, .. } => {
                 (format!("{}: {}", name, value), true)
             }
         };

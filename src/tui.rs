@@ -4,7 +4,7 @@
 //! menus, and handling terminal setup/cleanup using `crossterm`.
 use crate::game_logic::Board;
 use crate::menu::Menu;
-use crate::types::{COLOR_CONFIG, CellKind, CellState};
+use crate::types::{COLOR_CONFIG, CellKind, CellState, MenuItem};
 use crossterm::{
     cursor::{MoveTo, RestorePosition},
     event::{self, DisableMouseCapture, EnableMouseCapture},
@@ -277,9 +277,9 @@ pub fn render_menu(
     art_y: u16,
 ) -> Result<(), anyhow::Error> {
     for (i, item) in menu.items.iter().enumerate() {
-        let (label, _highlight) = match item {
-            crate::types::MenuItem::Main { name, .. } => (name.to_string(), false),
-            crate::types::MenuItem::Custom { name, value, .. } => {
+        let (label, is_adjustable) = match item {
+            MenuItem::Main { name, .. } => (name.to_string(), false),
+            MenuItem::Custom { name, value, .. } => {
                 (format!("{}: {}", name, value), true)
             }
         };
@@ -291,9 +291,18 @@ pub fn render_menu(
                 stdout,
                 MoveTo(menu_x - 2, menu_y),
                 SetForegroundColor(Color::Yellow),
-                Print("➤ "),
-                Print(label),
             )?;
+            if is_adjustable {
+                queue!(stdout,
+                    Print("< "),
+                    Print(label),
+                    Print(" >")
+                )?;
+            } else {
+                queue!(stdout,
+                    Print("➤ "),
+                    Print(label),)?;
+            }
         } else {
             queue!(
                 stdout,

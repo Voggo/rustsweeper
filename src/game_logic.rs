@@ -122,7 +122,6 @@ impl Board {
         self.timer.stop();
         Some(GameState::Won) // All non-mine cells are revealed
     }
-    // some bug here where it does not reveal empty in some scenarios
     pub fn reveal_adjacent_empty(&mut self, x: isize, y: isize) -> Option<GameState> {
         let mut to_reveal = vec![(x, y)];
         while let Some((cx, cy)) = to_reveal.pop() {
@@ -168,11 +167,7 @@ impl Board {
                 }
                 if let Some(neighbor) = self.get_cell_mut(x + dx, y + dy) {
                     if neighbor.state != CellState::Flagged {
-                        neighbor.state = CellState::Revealed;
-                        if neighbor.kind == CellKind::Mine {
-                            ret = Some(GameState::Lost);
-                            self.timer.stop();
-                        }
+                        ret = self.reveal_adjacent_empty(x + dx, y + dy);
                     }
                 }
             }

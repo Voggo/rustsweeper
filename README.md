@@ -1,9 +1,6 @@
 # Termsweeper
 
 A minimal terminal-based Minesweeper game written in Rust, using `crossterm` for cross-platform terminal UI.
-![menu](img/menu_screenshot.png)
-![game1](img/game_screenshot_1.png)
-![game2](img/game_screenshot_2.png)
 
 ## Features
 
@@ -60,6 +57,10 @@ fn main() {
 ### Custom Game
 
 Select "Custom" in the main menu to set your own board width, height, and number of mines. Use left/right arrows to adjust values, then select "Confirm" to start.
+
+### Screenshots
+![menu](img/menu_screenshot.png)
+![game1](img/game_screenshot_1.png)
 
 ### Todo
 - [x] Add timer to track game duration.

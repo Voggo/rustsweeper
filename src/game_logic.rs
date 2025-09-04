@@ -192,6 +192,9 @@ impl Board {
                 if let Some(neighbor) = self.get_cell_mut(x + dx, y + dy) {
                     if neighbor.state != CellState::Flagged {
                         ret = self.reveal_adjacent_empty(x + dx, y + dy);
+                        if ret.is_some() {
+                            return ret;
+                        }
                     }
                 }
             }

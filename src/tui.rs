@@ -146,14 +146,14 @@ pub fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<(
     }
     // Draw timer
     let elapsed_seconds = board.timer.get_elapsed_seconds();
-    let timer_str = format!("⏱: {:03}", elapsed_seconds);
+    let timer_str = format!("⏰: {:02}", elapsed_seconds);
     let timer_box = format_box_with_value(&timer_str);
     for (i, line) in timer_box.iter().enumerate() {
         queue!(
             stdout,
             SetForegroundColor(COLOR_CONFIG.counter),
             MoveTo(
-                board_start_x + required_width as u16 - timer_str.len() as u16 - 1,
+                board_start_x + required_width as u16 - timer_str.len() as u16 - 2,
                 board_start_y - 3 + i as u16
             ),
             Print(line),
@@ -220,7 +220,10 @@ pub fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<(
 }
 
 fn format_box_with_value(value: &str) -> Vec<String> {
-    let len = value.len();
+    let mut len = value.len();
+    if value.contains("⏰") {
+        len += 1;
+    }
     let top_bottom = format!("┌{}┐\n", "─".repeat(len));
     let middle = format!("│ {} │\n", value);
     let bottom = format!("└{}┘", "─".repeat(len));

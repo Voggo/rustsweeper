@@ -1,4 +1,4 @@
-//! Terminal UI rendering and setup for Rustsweeper.
+//! Terminal UI rendering and setup for Termsweeper.
 //!
 //! This module contains functions for rendering the Minesweeper game board,
 //! menus, and handling terminal setup/cleanup using `crossterm`.
@@ -241,11 +241,11 @@ fn format_box_with_value(value: &str) -> Vec<String> {
 /// Centers the menu in the terminal and highlights the hovered item.
 pub fn render_game_menu(stdout: &mut Stdout, menu: &Menu) -> anyhow::Result<()> {
     let title_art = [
-        "  ____  _   _ ____ _____ ______        _______ _____ ____  _____ ____  ",
-        " |  _ \\| | | / ___|_   _/ ___\\ \\      / / ____| ____|  _ \\| ____|  _ \\ ",
-        " | |_) | | | \\___ \\ | | \\___ \\\\ \\ /\\ / /|  _| |  _| | |_) |  _| | |_) |",
-        " |  _ <| |_| |___) || |  ___) |\\ V  V / | |___| |___|  __/| |___|  _ < ",
-        " |_| \\_\\\\___/|____/ |_| |____/  \\_/\\_/  |_____|_____|_|   |_____|_| \\_\\",
+        "  _____ _____ ____  __  __ ______        _______ _____ ____  _____ ____  ",
+        " |_   _| ____|  _ \\|  \\/  / ___\\ \\      / / ____| ____|  _ \\| ____|  _ \\ ",
+        "   | | |  _| | |_) | |\\/| \\___ \\\\ \\ /\\ / /|  _| |  _| | |_) |  _| | |_) |",
+        "   | | | |___|  _ <| |  | |___) |\\ V  V / | |___| |___|  __/| |___|  _ < ",
+        "   |_| |_____|_| \\_\\_|  |_|____/  \\_/\\_/  |_____|_____|_|   |_____|_| \\_\\",
     ];
 
     let (cols, rows) = crossterm::terminal::size()?;

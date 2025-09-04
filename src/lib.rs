@@ -1,4 +1,4 @@
-//! # Rustsweeper
+//! # Termsweeper
 //!
 //! A minimal terminal-based Minesweeper game written in Rust, using `crossterm` for cross-platform terminal UI.
 //!

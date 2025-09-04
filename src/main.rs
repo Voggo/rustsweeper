@@ -1,4 +1,4 @@
-use rustsweeper::{
+use termsweeper::{
     game_logic::Board,
     menu::{self, Menu},
     tui::{self, cleanup_terminal, render_game_board, setup_terminal},

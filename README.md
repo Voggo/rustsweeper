@@ -1,4 +1,4 @@
-# Rustsweeper
+# Termsweeper
 
 A minimal terminal-based Minesweeper game written in Rust, using `crossterm` for cross-platform terminal UI.
 ![menu](img/menu_screenshot.png)
@@ -30,13 +30,13 @@ Add this crate to your dependencies in `Cargo.toml`:
 
 ```toml
 [dependencies]
-rustsweeper = "0.1.0"
+termsweeper = "0.1.0"
 ```
 
 Then, in your code:
 
 ```rust
-use rustsweeper::game_logic::Board;
+use termsweeper::game_logic::Board;
 
 fn main() {
     let mut board = Board::new();
@@ -50,7 +50,7 @@ fn main() {
 2. Clone the repository:
    ```
    git clone <repo-url>
-   cd rustsweeper
+   cd termsweeper
    ```
 3. Build and run:
    ```

@@ -1,6 +1,6 @@
 use ::crossterm::style::Color;
 
-///! Types and configuration for Rustsweeper.
+///! Types and configuration for termsweeper.
 ///!
 ///! This module defines the core types used for game state, board cells, menu items,
 ///! and color configuration for the terminal UI.

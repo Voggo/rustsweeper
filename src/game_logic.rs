@@ -3,16 +3,21 @@ use crate::types::*;
 use crossterm::event;
 use rand::prelude::*;
 
+/// Represents the Minesweeper game board and its state.
 pub struct Board {
     grid: Vec<CellBox>,
+    /// Board width in cells.
     pub width: usize,
+    /// Board height in cells.
     pub height: usize,
+    /// Timer tracking game duration.
     pub timer: Timer,
     mines_placed: bool,
     mines_to_place: usize,
 }
 
 impl Board {
+    /// Creates a new board with default configuration.
     pub fn new() -> Board {
         let grid = vec![
             CellBox {
@@ -31,6 +36,7 @@ impl Board {
         }
     }
 
+    /// Creates a new board with a custom configuration.
     pub fn new_with_config(config: GameConfig) -> Board {
         let grid = vec![
             CellBox {
@@ -49,6 +55,9 @@ impl Board {
         }
     }
 
+    /// Initializes the board, placing mines and calculating numbers.
+    ///
+    /// Ensures the first click is never a mine.
     pub fn initialize_board(&mut self, initial_click_x: isize, initial_click_y: isize) {
         let mut rng = rand::rng();
         let mut set_index = (0..(self.width * self.height)).collect::<Vec<usize>>();
@@ -81,6 +90,7 @@ impl Board {
         self.timer.start();
     }
 
+    /// Resets the board to its initial state.
     pub fn reset(&mut self) {
         self.grid.iter_mut().for_each(|cell| {
             cell.kind = CellKind::Number(0);
@@ -90,6 +100,7 @@ impl Board {
         self.timer.reset();
     }
 
+    /// Gets a reference to a cell at (x, y).
     pub fn get_cell(&self, x: isize, y: isize) -> Option<&CellBox> {
         if x >= 0 && x < self.width as isize && y >= 0 && y < self.height as isize {
             let index = y * self.width as isize + x;
@@ -99,6 +110,7 @@ impl Board {
         }
     }
 
+    /// Gets a mutable reference to a cell at (x, y).
     pub fn get_cell_mut(&mut self, x: isize, y: isize) -> Option<&mut CellBox> {
         if x >= 0 && x < self.width as isize && y >= 0 && y < self.height as isize {
             let index = y * self.width as isize + x;
@@ -107,12 +119,16 @@ impl Board {
             None
         }
     }
+
+    /// Returns the starting position for rendering the board in the terminal.
     pub fn get_board_start_pos(&self) -> (u16, u16) {
         let (cols, rows) = crossterm::terminal::size().expect("Failed to get terminal size");
         let board_start_x = (cols as i16 - (self.width * 2 + 2) as i16) / 2;
         let board_start_y = (rows as i16 - self.height as i16) / 2;
         (board_start_x as u16, board_start_y as u16)
     }
+
+    /// Checks if the win condition is met.
     fn check_win_condition(&mut self) -> Option<GameState> {
         for cell in self.grid.iter() {
             if cell.kind != CellKind::Mine && cell.state != CellState::Revealed {
@@ -122,6 +138,10 @@ impl Board {
         self.timer.stop();
         Some(GameState::Won) // All non-mine cells are revealed
     }
+
+    /// Reveals adjacent empty cells.
+    ///
+    /// Returns Some(GameState) if the game state changes (win/loss).
     pub fn reveal_adjacent_empty(&mut self, x: isize, y: isize) -> Option<GameState> {
         let mut to_reveal = vec![(x, y)];
         while let Some((cx, cy)) = to_reveal.pop() {
@@ -158,6 +178,10 @@ impl Board {
         }
         return self.check_win_condition();
     }
+
+    /// Reveals all non-flagged adjacent cells around a given cell.
+    ///
+    /// Returns Some(GameState) if the game state changes (win/loss).
     pub fn reveal_non_flagged(&mut self, x: isize, y: isize) -> Option<GameState> {
         let mut ret = None;
         for dy in -1..=1 {
@@ -177,6 +201,8 @@ impl Board {
         }
         return ret;
     }
+
+    /// Reveals all mines on the board.
     pub fn reveal_all_mines(&mut self) {
         for cell in self.grid.iter_mut() {
             if cell.kind == CellKind::Mine {
@@ -184,6 +210,8 @@ impl Board {
             }
         }
     }
+
+    /// Converts mouse event coordinates to board cell coordinates.
     fn cell_coords_from_mouse(&self, event: event::MouseEvent) -> Option<(isize, isize)> {
         let (board_start_x, board_start_y) = self.get_board_start_pos();
 
@@ -200,6 +228,10 @@ impl Board {
             None // Click was outside the board
         }
     }
+
+    /// Handles left mouse click event for revealing cells.
+    ///
+    /// Returns Some(GameState) if the game state changes (win/loss).
     pub fn handle_mouse_left(&mut self, event: event::MouseEvent) -> Option<GameState> {
         if let Some((cell_x, cell_y)) = self.cell_coords_from_mouse(event) {
             if self.mines_placed == false {
@@ -233,6 +265,8 @@ impl Board {
         }
         None
     }
+
+    /// Handles right mouse click event for flagging/unflagging cells.
     pub fn handle_mouse_right(&mut self, event: event::MouseEvent) {
         if let Some((cell_x, cell_y)) = self.cell_coords_from_mouse(event) {
             if let Some(cell) = self.get_cell_mut(cell_x, cell_y) {
@@ -244,6 +278,8 @@ impl Board {
             }
         }
     }
+
+    /// Clamps the game configuration values to allowed ranges.
     pub fn clamp_config(width: usize, height: usize, mines: usize) -> GameConfig {
         let clamped_width = width.clamp(MIN_WIDTH, MAX_WIDTH);
         let clamped_height = height.clamp(MIN_HEIGHT, MAX_HEIGHT);
@@ -255,10 +291,15 @@ impl Board {
             mines: clamped_mines,
         }
     }
+
+    /// Returns the number of remaining mines to be flagged.
     pub fn get_remaining_mines(&self) -> isize {
         self.mines_to_place as isize - self.get_flags_count() as isize
     }
-    // could maybe cache this in the struct instead of calculating it every time
+
+    /// Returns the number of flagged cells.
+    ///
+    /// Could be cached for performance.
     fn get_flags_count(&self) -> usize {
         self.grid
             .iter()

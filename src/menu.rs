@@ -2,14 +2,21 @@ use crate::game_logic::Board;
 use crate::types::{GameConfig, GameState, MenuItem, MenuItemType};
 use crossterm::event;
 
+/// Represents a menu in the Minesweeper game.
+///
+/// Holds the list of menu items, the currently hovered index, and the selected item.
 #[derive(Debug, Clone)]
 pub struct Menu {
+    /// List of menu items displayed in the menu.
     pub items: Vec<MenuItem>,
+    /// Index of the currently hovered menu item.
     pub hovered_index: usize,
+    /// The currently selected menu item, if any.
     pub selected: Option<MenuItem>,
 }
 
 impl Menu {
+    /// Creates a new menu from a list of menu items.
     pub fn new(items: Vec<MenuItem>) -> Menu {
         Menu {
             items,
@@ -17,22 +24,34 @@ impl Menu {
             selected: None,
         }
     }
+
+    /// Creates the main menu with predefined items.
     pub fn new_main_menu() -> Menu {
         Menu::new(MAIN_MENU_ITEMS_LIST.to_vec())
     }
+
+    /// Creates the custom configuration menu.
     pub fn new_custom_menu() -> Menu {
         Menu::new(CUSTOM_MENU_ITEMS_LIST.to_vec())
     }
+
+    /// Returns a reference to the currently hovered menu item.
     pub fn get_hovered_item(&self) -> &MenuItem {
         &self.items[self.hovered_index]
     }
+
+    /// Selects the currently hovered menu item.
     pub fn select(&mut self) {
         let selected_item = self.get_hovered_item().clone();
         self.selected = Some(selected_item);
     }
+
+    /// Moves the hovered index to the next item.
     pub fn next(&mut self) {
         self.hovered_index = (self.hovered_index + 1) % self.items.len();
     }
+
+    /// Moves the hovered index to the previous item.
     pub fn previous(&mut self) {
         if self.hovered_index == 0 {
             self.hovered_index = self.items.len() - 1;
@@ -40,9 +59,13 @@ impl Menu {
             self.hovered_index -= 1;
         }
     }
+
+    /// Returns the number of items in the menu.
     pub fn len(&self) -> usize {
         self.items.len()
     }
+
+    /// Returns a custom game configuration if all values are set.
     pub fn get_custom_config(&self) -> Option<GameConfig> {
         let mut config = GameConfig {
             width: 0,
@@ -71,6 +94,9 @@ impl Menu {
     }
 }
 
+/// Handles keyboard events for menu navigation and selection.
+///
+/// Supports up/down navigation, selection, and value adjustment for custom menu items.
 pub fn handle_menu_event(event: &event::Event, menu: &mut Menu) {
     if let event::Event::Key(key_event) = event {
         match key_event.code {
@@ -120,6 +146,9 @@ pub fn handle_menu_event(event: &event::Event, menu: &mut Menu) {
     }
 }
 
+/// Processes the selected menu item and updates the game state accordingly.
+///
+/// Handles starting new games, switching to custom menu, exiting, and confirming custom configuration.
 pub fn process_menu_selection(
     current_menu: &mut Menu,
     board: &mut Board,
@@ -164,6 +193,7 @@ pub fn process_menu_selection(
     }
 }
 
+/// List of main menu items for the Minesweeper game.
 const MAIN_MENU_ITEMS_LIST: [MenuItem; 5] = [
     MenuItem::Main {
         item_type: MenuItemType::Beginnner,
@@ -204,6 +234,7 @@ const MAIN_MENU_ITEMS_LIST: [MenuItem; 5] = [
     },
 ];
 
+/// List of custom configuration menu items for the Minesweeper game.
 const CUSTOM_MENU_ITEMS_LIST: [MenuItem; 4] = [
     MenuItem::Custom {
         item_type: MenuItemType::Width,

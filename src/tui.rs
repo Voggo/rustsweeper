@@ -1,3 +1,7 @@
+//! Terminal UI rendering and setup for Rustsweeper.
+//!
+//! This module contains functions for rendering the Minesweeper game board,
+//! menus, and handling terminal setup/cleanup using `crossterm`.
 use crate::game_logic::Board;
 use crate::menu::Menu;
 use crate::types::{COLOR_CONFIG, CellKind, CellState};
@@ -10,14 +14,14 @@ use crossterm::{
 };
 use std::io::{Stdout, Write};
 
-// set up and clean up section
+/// Set up and clean up section
 pub fn setup_terminal(mut stdout: &Stdout) -> Result<(), std::io::Error> {
     terminal::enable_raw_mode()?;
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     return Ok(());
 }
 
-// set styles
+/// set styles
 pub fn set_styles(mut stdout: &Stdout) -> Result<(), std::io::Error> {
     execute!(
         stdout,
@@ -28,6 +32,7 @@ pub fn set_styles(mut stdout: &Stdout) -> Result<(), std::io::Error> {
     return Ok(());
 }
 
+/// Restore terminal to original state
 pub fn cleanup_terminal(mut stdout: &Stdout) -> Result<(), std::io::Error> {
     while event::poll(std::time::Duration::from_millis(1))? {
         let _ = event::read(); // Clear any pending events
@@ -103,6 +108,8 @@ pub fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyho
 }
 
 // put into seperate function to avoid code duplication and make more readable
+/// Render the game board to the terminal using crossterm.
+/// Handles terminal resizing and displays a warning if the terminal is too small.
 pub fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<()> {
     let (cols, rows) = crossterm::terminal::size()?;
     let required_width = 2 + board.width * 2;
@@ -230,6 +237,8 @@ fn format_box_with_value(value: &str) -> Vec<String> {
     vec![top_bottom, middle, bottom]
 }
 
+/// Render the main game menu with ASCII art title and menu items.
+/// Centers the menu in the terminal and highlights the hovered item.
 pub fn render_game_menu(stdout: &mut Stdout, menu: &Menu) -> anyhow::Result<()> {
     let title_art = [
         "  ____  _   _ ____ _____ ______        _______ _____ ____  _____ ____  ",
@@ -258,6 +267,8 @@ pub fn render_game_menu(stdout: &mut Stdout, menu: &Menu) -> anyhow::Result<()> 
     Ok(())
 }
 
+/// Render the menu items, highlighting the hovered item.
+/// Centers the menu items below the ASCII art title.
 pub fn render_menu(
     stdout: &mut Stdout,
     menu: &Menu,

@@ -13,7 +13,7 @@ A minimal terminal-based Minesweeper game written in Rust, using `crossterm` for
 - Custom board configuration
 - Colorful terminal UI
 
-## Controls
+### Controls
 
 - **Arrow Keys**: Navigate menus
 - **Enter**: Select menu item
@@ -24,24 +24,44 @@ A minimal terminal-based Minesweeper game written in Rust, using `crossterm` for
 - **Mouse Right Click**: Flag/unflag cell
 - **Left/Right Arrow (Custom Menu)**: Decrease/increase custom values
 
-## How to Run
+### Usage
+
+Add this crate to your dependencies in `Cargo.toml`:
+
+```toml
+[dependencies]
+rustsweeper = "0.1.0"
+```
+
+Then, in your code:
+
+```rust
+use rustsweeper::game_logic::Board;
+
+fn main() {
+    let mut board = Board::new();
+    // ... interact with the board, or run the game loop
+}
+```
+
+### How to Run
 
 1. Make sure you have Rust installed: https://rustup.rs
 2. Clone the repository:
    ```
    git clone <repo-url>
-   cd rust_sweeper
+   cd rustsweeper
    ```
 3. Build and run:
    ```
    cargo run --release
    ```
 
-## Custom Game
+### Custom Game
 
 Select "Custom" in the main menu to set your own board width, height, and number of mines. Use left/right arrows to adjust values, then select "Confirm" to start.
 
-## Todo
+### Todo
 - [x] Add timer to track game duration.
 - [x] Add mine counter to display unflagged mines.
 - [ ] Add a high score leaderboard.
@@ -49,7 +69,7 @@ Select "Custom" in the main menu to set your own board width, height, and number
 - [ ] Refactor tui.rs code to be more modular.
 - [ ] Add Themes.
 
-## Dependencies
+### Dependencies
 
 - [crossterm](https://crates.io/crates/crossterm)
 - [rand](https://crates.io/crates/rand)

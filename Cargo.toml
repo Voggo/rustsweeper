@@ -2,6 +2,7 @@
 name = "rustsweeper"
 version = "0.1.0"
 edition = "2024"
+description = "A terminal-based Minesweeper game written in Rust."
 authors = ["Viggo Stark"]
 license = "MIT"
 homepage = "https://github.com/Voggo/rustsweeper"

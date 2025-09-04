@@ -42,10 +42,12 @@ A minimal terminal-based Minesweeper game written in Rust, using `crossterm` for
 Select "Custom" in the main menu to set your own board width, height, and number of mines. Use left/right arrows to adjust values, then select "Confirm" to start.
 
 ## Todo
-- Add timer to track game duration.
-- Add mine counter to display unflagged mines.
-- Add Themes.
-- Add a high score leaderboard.
+- [x] Add timer to track game duration.
+- [x] Add mine counter to display unflagged mines.
+- [ ] Add a high score leaderboard.
+- [ ] Refactor to make error handling more consistent.
+- [ ] Refactor tui.rs code to be more modular.
+- [ ] Add Themes.
 
 ## Dependencies
 

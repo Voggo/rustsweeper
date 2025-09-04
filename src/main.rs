@@ -36,6 +36,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     let mut board = Board::new();
     let mut game_state = GameState::Menu;
+
     let main_menu = Menu::new_main_menu();
     let mut current_menu = Box::new(main_menu);
     tui::set_styles(&stdout)?;
@@ -53,6 +54,13 @@ fn main() -> Result<(), anyhow::Error> {
             }
             GameState::Exit => {
                 break 'game_loop;
+            }
+        }
+        // Wait for event, but only up to 100ms
+        if let Ok(false) = event::poll(std::time::Duration::from_millis(100)) {
+            if game_state == GameState::Ongoing {
+                render_game_board(&board, &mut stdout)?;
+                continue;
             }
         }
         let event = event::read()?;
@@ -86,7 +94,7 @@ fn main() -> Result<(), anyhow::Error> {
                 }
             }
             GameState::Won | GameState::Lost => {
-                board.all_mines_revealed();
+                board.reveal_all_mines();
                 if should_restart(&event) {
                     game_state = GameState::Ongoing;
                     board.reset();

@@ -70,6 +70,7 @@ pub struct ColorConfig {
     pub empty_cell: Color,
     pub number: [Color; 8],
     pub border: Color,
+    pub counter: Color,
 }
 
 pub const MIN_WIDTH: usize = 5;
@@ -102,4 +103,5 @@ pub const COLOR_CONFIG: ColorConfig = ColorConfig {
         Color::Grey,       // 8
     ],
     border: Color::Black,
+    counter: Color::Blue,
 };

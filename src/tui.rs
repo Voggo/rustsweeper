@@ -76,7 +76,7 @@ pub fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyho
 
     let (_, board_start_y) = board.get_board_start_pos();
     let art_y = if board_start_y >= art_height + 1 {
-        board_start_y - art_height - 1
+        board_start_y - art_height - 3
     } else {
         (rows.saturating_sub(art_height)) / 2
     };
@@ -102,6 +102,7 @@ pub fn overlay_ascii_art(stdout: &mut Stdout, board: &Board, win: bool) -> anyho
     Ok(())
 }
 
+// put into seperate function to avoid code duplication and make more readable
 pub fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<()> {
     let (cols, rows) = crossterm::terminal::size()?;
     let required_width = 2 + board.width * 2;
@@ -131,6 +132,33 @@ pub fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<(
         Clear(terminal::ClearType::All),
         MoveTo(board_start_x, board_start_y)
     )?;
+    // Draw bombs counter
+    let bombs_left = board.get_remaining_mines();
+    let bombs_left_str = format!("💣: {}", bombs_left);
+    let counter_box = format_box_with_value(&bombs_left_str);
+    for (i, line) in counter_box.iter().enumerate() {
+        queue!(
+            stdout,
+            SetForegroundColor(COLOR_CONFIG.counter),
+            MoveTo(board_start_x, board_start_y - 3 + i as u16),
+            Print(line),
+        )?;
+    }
+    // Draw timer
+    let elapsed_seconds = board.timer.get_elapsed_seconds();
+    let timer_str = format!("⏱: {:03}", elapsed_seconds);
+    let timer_box = format_box_with_value(&timer_str);
+    for (i, line) in timer_box.iter().enumerate() {
+        queue!(
+            stdout,
+            SetForegroundColor(COLOR_CONFIG.counter),
+            MoveTo(
+                board_start_x + required_width as u16 - timer_str.len() as u16 - 1,
+                board_start_y - 3 + i as u16
+            ),
+            Print(line),
+        )?;
+    }
     // Draw top border
     queue!(
         stdout,
@@ -189,6 +217,14 @@ pub fn render_game_board(board: &Board, stdout: &mut Stdout) -> anyhow::Result<(
     queue!(stdout, Print("─┘"))?;
     stdout.flush()?;
     Ok(())
+}
+
+fn format_box_with_value(value: &str) -> Vec<String> {
+    let len = value.len();
+    let top_bottom = format!("┌{}┐\n", "─".repeat(len));
+    let middle = format!("│ {} │\n", value);
+    let bottom = format!("└{}┘", "─".repeat(len));
+    vec![top_bottom, middle, bottom]
 }
 
 pub fn render_game_menu(stdout: &mut Stdout, menu: &Menu) -> anyhow::Result<()> {

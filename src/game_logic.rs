@@ -1,3 +1,4 @@
+use crate::timer::Timer;
 use crate::types::*;
 use crossterm::event;
 use rand::prelude::*;
@@ -6,6 +7,7 @@ pub struct Board {
     grid: Vec<CellBox>,
     pub width: usize,
     pub height: usize,
+    pub timer: Timer,
     mines_placed: bool,
     mines_to_place: usize,
 }
@@ -23,6 +25,7 @@ impl Board {
             grid,
             width: DEFAULT_CONFIG.width,
             height: DEFAULT_CONFIG.height,
+            timer: Timer::new(),
             mines_to_place: DEFAULT_CONFIG.mines,
             mines_placed: false,
         }
@@ -40,6 +43,7 @@ impl Board {
             grid,
             width: config.width,
             height: config.height,
+            timer: Timer::new(),
             mines_to_place: config.mines,
             mines_placed: false,
         }
@@ -74,6 +78,7 @@ impl Board {
                 }
             }
         }
+        self.timer.start();
     }
 
     pub fn reset(&mut self) {
@@ -82,6 +87,7 @@ impl Board {
             cell.state = CellState::Hidden;
         });
         self.mines_placed = false;
+        self.timer.reset();
     }
 
     pub fn get_cell(&self, x: isize, y: isize) -> Option<&CellBox> {
@@ -107,14 +113,16 @@ impl Board {
         let board_start_y = (rows as i16 - self.height as i16) / 2;
         (board_start_x as u16, board_start_y as u16)
     }
-    pub fn check_win_condition(&self) -> Option<GameState> {
+    fn check_win_condition(&mut self) -> Option<GameState> {
         for cell in self.grid.iter() {
             if cell.kind != CellKind::Mine && cell.state != CellState::Revealed {
                 return None; // Found a non-mine cell that is not revealed
             }
         }
+        self.timer.stop();
         Some(GameState::Won) // All non-mine cells are revealed
     }
+    // some bug here where it does not reveal empty in some scenarios
     pub fn reveal_adjacent_empty(&mut self, x: isize, y: isize) -> Option<GameState> {
         let mut to_reveal = vec![(x, y)];
         while let Some((cx, cy)) = to_reveal.pop() {
@@ -124,6 +132,7 @@ impl Board {
                     CellState::Hidden => {
                         cell.state = CellState::Revealed;
                         if cell.kind == CellKind::Mine {
+                            self.timer.stop();
                             return Some(GameState::Lost); // Stop if it's a mine
                         }
                     }
@@ -162,6 +171,7 @@ impl Board {
                         neighbor.state = CellState::Revealed;
                         if neighbor.kind == CellKind::Mine {
                             ret = Some(GameState::Lost);
+                            self.timer.stop();
                         }
                     }
                 }
@@ -172,7 +182,7 @@ impl Board {
         }
         return ret;
     }
-    pub fn all_mines_revealed(&mut self) {
+    pub fn reveal_all_mines(&mut self) {
         for cell in self.grid.iter_mut() {
             if cell.kind == CellKind::Mine {
                 cell.state = CellState::Revealed;
@@ -249,5 +259,15 @@ impl Board {
             height: clamped_height,
             mines: clamped_mines,
         }
+    }
+    pub fn get_remaining_mines(&self) -> isize {
+        self.mines_to_place as isize - self.get_flags_count() as isize
+    }
+    // could maybe cache this in the struct instead of calculating it every time
+    fn get_flags_count(&self) -> usize {
+        self.grid
+            .iter()
+            .filter(|cell| cell.state == CellState::Flagged)
+            .count()
     }
 }

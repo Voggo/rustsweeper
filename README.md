@@ -21,13 +21,19 @@ A minimal terminal-based Minesweeper game written in Rust, using `crossterm` for
 - **Mouse Right Click**: Flag/unflag cell
 - **Left/Right Arrow (Custom Menu)**: Decrease/increase custom values
 
+### Install
+
+```
+cargo install termsweeper
+```
+
 ### Usage
 
 Add this crate to your dependencies in `Cargo.toml`:
 
 ```toml
 [dependencies]
-termsweeper = "0.1.0"
+termsweeper = "0.1.1"
 ```
 
 Then, in your code:
